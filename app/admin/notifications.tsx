@@ -1,0 +1,475 @@
+import React, { useState, useEffect } from "react";
+import {
+  View,
+  Text,
+  SafeAreaView,
+  StatusBar,
+  TouchableOpacity,
+  FlatList,
+  TextInput,
+  Alert,
+  ActivityIndicator,
+  Modal,
+  ScrollView,
+} from "react-native";
+import { useRouter } from "expo-router";
+import {
+  ArrowLeft,
+  Plus,
+  Search,
+  Trash2,
+  X,
+  Send,
+  Bell,
+  Users,
+  FileText,
+  Info,
+  Heart,
+  Play,
+} from "lucide-react-native";
+import { supabase } from "../lib/supabase";
+import { useAuth } from "../context/AuthContext";
+
+interface Notification {
+  id: string;
+  title: string;
+  message: string;
+  type: string;
+  created_at: string;
+  sent_to: string;
+  is_read?: boolean;
+}
+
+export default function NotificationManagement() {
+  const router = useRouter();
+  const { user } = useAuth();
+  const [notificationList, setNotificationList] = useState<Notification[]>([]);
+  const [filteredNotificationList, setFilteredNotificationList] = useState<
+    Notification[]
+  >([]);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [modalVisible, setModalVisible] = useState(false);
+  const [currentNotification, setCurrentNotification] = useState<{
+    title: string;
+    message: string;
+    type: string;
+    audience: string;
+  }>({
+    title: "",
+    message: "",
+    type: "system",
+    audience: "all",
+  });
+
+  // Notification types
+  const notificationTypes = [
+    { id: "system", name: "System", icon: Info, color: "#A78BFA" },
+    {
+      id: "anime_recommendation",
+      name: "Anime Recommendation",
+      icon: Play,
+      color: "#60A5FA",
+    },
+    {
+      id: "friend_activity",
+      name: "Friend Activity",
+      icon: Heart,
+      color: "#F87171",
+    },
+  ];
+
+  // Audience types
+  const audienceTypes = [
+    { id: "all", name: "All Users" },
+    { id: "active", name: "Active Users" },
+    { id: "inactive", name: "Inactive Users" },
+    { id: "admins", name: "Admins Only" },
+  ];
+
+  // Fetch notification list on component mount
+  useEffect(() => {
+    fetchNotificationList();
+  }, []);
+
+  // Filter notification list when search query changes
+  useEffect(() => {
+    if (searchQuery.trim() === "") {
+      setFilteredNotificationList(notificationList);
+    } else {
+      const filtered = notificationList.filter(
+        (notification) =>
+          notification.title
+            .toLowerCase()
+            .includes(searchQuery.toLowerCase()) ||
+          notification.message
+            .toLowerCase()
+            .includes(searchQuery.toLowerCase()),
+      );
+      setFilteredNotificationList(filtered);
+    }
+  }, [searchQuery, notificationList]);
+
+  // Fetch notification list from Supabase
+  const fetchNotificationList = async () => {
+    setLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from("notifications")
+        .select("*")
+        .order("created_at", { ascending: false });
+
+      if (error) throw error;
+
+      // Add sent_to field for demo purposes
+      const enhancedData = data.map((notification: any) => ({
+        ...notification,
+        sent_to: notification.user_id ? "Specific User" : "All Users",
+      }));
+
+      setNotificationList(enhancedData);
+      setFilteredNotificationList(enhancedData);
+    } catch (error) {
+      console.error("Error fetching notifications:", error);
+      Alert.alert("Error", "Failed to fetch notification list");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Handle back button press
+  const handleBackPress = () => {
+    router.back();
+  };
+
+  // Handle add new notification
+  const handleAddNotification = () => {
+    setCurrentNotification({
+      title: "",
+      message: "",
+      type: "system",
+      audience: "all",
+    });
+    setModalVisible(true);
+  };
+
+  // Handle delete notification
+  const handleDeleteNotification = (id: string) => {
+    Alert.alert(
+      "Delete Notification",
+      "Are you sure you want to delete this notification?",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          onPress: async () => {
+            try {
+              const { error } = await supabase
+                .from("notifications")
+                .delete()
+                .eq("id", id);
+
+              if (error) throw error;
+
+              // Update the local state
+              setNotificationList(
+                notificationList.filter(
+                  (notification) => notification.id !== id,
+                ),
+              );
+              Alert.alert("Success", "Notification deleted successfully");
+            } catch (error) {
+              console.error("Error deleting notification:", error);
+              Alert.alert("Error", "Failed to delete notification");
+            }
+          },
+          style: "destructive",
+        },
+      ],
+    );
+  };
+
+  // Handle send notification
+  const handleSendNotification = async () => {
+    // Validate form
+    if (!currentNotification.title.trim()) {
+      Alert.alert("Error", "Title is required");
+      return;
+    }
+
+    if (!currentNotification.message.trim()) {
+      Alert.alert("Error", "Message is required");
+      return;
+    }
+
+    try {
+      // In a real app, you would fetch users based on audience
+      // For this demo, we'll just create a notification for the current user
+      const { error } = await supabase.from("notifications").insert({
+        title: currentNotification.title,
+        message: currentNotification.message,
+        type: currentNotification.type,
+        user_id: user?.id, // In a real app, this would be based on audience
+        is_read: false,
+      });
+
+      if (error) throw error;
+
+      // Refresh notification list
+      await fetchNotificationList();
+      setModalVisible(false);
+      Alert.alert(
+        "Success",
+        `Notification sent to ${currentNotification.audience} users`,
+      );
+    } catch (error) {
+      console.error("Error sending notification:", error);
+      Alert.alert("Error", "Failed to send notification");
+    }
+  };
+
+  // Get icon based on notification type
+  const getNotificationIcon = (type: string) => {
+    const notificationType = notificationTypes.find((t) => t.id === type);
+    if (notificationType) {
+      const IconComponent = notificationType.icon;
+      return <IconComponent size={20} color={notificationType.color} />;
+    }
+    return <Bell size={20} color="#9CA3AF" />;
+  };
+
+  // Render notification item
+  const renderNotificationItem = ({ item }: { item: Notification }) => (
+    <View className="bg-gray-800 rounded-lg p-4 mb-3">
+      <View className="flex-row items-start">
+        <View className="w-10 h-10 rounded-full bg-gray-700 items-center justify-center mr-3">
+          {getNotificationIcon(item.type)}
+        </View>
+
+        <View className="flex-1">
+          <View className="flex-row justify-between items-start">
+            <Text className="text-white font-semibold text-base flex-1 mr-2">
+              {item.title}
+            </Text>
+            <Text className="text-gray-400 text-xs">
+              {new Date(item.created_at).toLocaleDateString()}
+            </Text>
+          </View>
+
+          <Text className="text-gray-300 mt-1" numberOfLines={2}>
+            {item.message}
+          </Text>
+
+          <View className="flex-row mt-2">
+            <View className="bg-gray-700 rounded-full px-2 py-0.5 mr-2">
+              <Text className="text-gray-300 text-xs">{item.type}</Text>
+            </View>
+            <View className="bg-gray-700 rounded-full px-2 py-0.5">
+              <Text className="text-gray-300 text-xs">{item.sent_to}</Text>
+            </View>
+          </View>
+        </View>
+
+        <TouchableOpacity
+          className="bg-red-600/30 p-2 rounded-full ml-2"
+          onPress={() => handleDeleteNotification(item.id)}
+        >
+          <Trash2 size={16} color="#F87171" />
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+
+  return (
+    <SafeAreaView className="flex-1 bg-gray-900">
+      <StatusBar barStyle="light-content" backgroundColor="#111827" />
+      <View className="flex-1">
+        {/* Header */}
+        <View className="w-full h-[60px] bg-gray-900 flex-row items-center justify-between px-4 border-b border-gray-800">
+          <TouchableOpacity onPress={handleBackPress}>
+            <ArrowLeft size={24} color="#FFFFFF" />
+          </TouchableOpacity>
+          <Text className="text-white font-bold text-lg">
+            Notification Management
+          </Text>
+          <TouchableOpacity onPress={handleAddNotification}>
+            <Plus size={24} color="#FFFFFF" />
+          </TouchableOpacity>
+        </View>
+
+        {/* Search Bar */}
+        <View className="p-4">
+          <View className="flex-row items-center bg-gray-800 rounded-lg px-3 py-2">
+            <Search size={20} color="#9CA3AF" />
+            <TextInput
+              className="flex-1 text-white ml-2"
+              placeholder="Search notifications..."
+              placeholderTextColor="#9CA3AF"
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+            />
+            {searchQuery.length > 0 && (
+              <TouchableOpacity onPress={() => setSearchQuery("")}>
+                <X size={18} color="#9CA3AF" />
+              </TouchableOpacity>
+            )}
+          </View>
+        </View>
+
+        {/* Notification List */}
+        {loading ? (
+          <View className="flex-1 items-center justify-center">
+            <ActivityIndicator size="large" color="#6366F1" />
+            <Text className="text-gray-400 mt-4">Loading notifications...</Text>
+          </View>
+        ) : (
+          <FlatList
+            data={filteredNotificationList}
+            renderItem={renderNotificationItem}
+            keyExtractor={(item) => item.id}
+            contentContainerStyle={{ padding: 16 }}
+            ListEmptyComponent={
+              <View className="flex-1 items-center justify-center py-10">
+                <Text className="text-gray-400 text-lg">
+                  {searchQuery
+                    ? "No notifications found matching your search"
+                    : "No notifications available"}
+                </Text>
+                <TouchableOpacity
+                  className="mt-4 bg-blue-600 px-4 py-2 rounded-lg"
+                  onPress={handleAddNotification}
+                >
+                  <Text className="text-white">Create New Notification</Text>
+                </TouchableOpacity>
+              </View>
+            }
+          />
+        )}
+
+        {/* Add Notification Modal */}
+        <Modal
+          visible={modalVisible}
+          transparent
+          animationType="slide"
+          onRequestClose={() => setModalVisible(false)}
+        >
+          <View className="flex-1 justify-center items-center bg-black/70">
+            <View className="w-[90%] bg-gray-900 rounded-xl p-4 max-h-[80%]">
+              <View className="flex-row justify-between items-center mb-4">
+                <Text className="text-white text-xl font-bold">
+                  Send New Notification
+                </Text>
+                <TouchableOpacity onPress={() => setModalVisible(false)}>
+                  <X size={24} color="#FFFFFF" />
+                </TouchableOpacity>
+              </View>
+
+              <ScrollView className="flex-1">
+                {/* Notification Type */}
+                <View className="mb-4">
+                  <Text className="text-gray-300 mb-2">Notification Type</Text>
+                  <View className="flex-row flex-wrap">
+                    {notificationTypes.map((type) => {
+                      const IconComponent = type.icon;
+                      return (
+                        <TouchableOpacity
+                          key={type.id}
+                          className={`flex-row items-center mr-2 mb-2 p-2 rounded-lg ${currentNotification.type === type.id ? "bg-gray-700" : "bg-gray-800"}`}
+                          onPress={() =>
+                            setCurrentNotification({
+                              ...currentNotification,
+                              type: type.id,
+                            })
+                          }
+                        >
+                          <IconComponent size={16} color={type.color} />
+                          <Text className="text-white ml-1">{type.name}</Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                </View>
+
+                {/* Audience Selection */}
+                <View className="mb-4">
+                  <Text className="text-gray-300 mb-2">Send To</Text>
+                  <View className="flex-row flex-wrap">
+                    {audienceTypes.map((audience) => (
+                      <TouchableOpacity
+                        key={audience.id}
+                        className={`flex-row items-center mr-2 mb-2 p-2 rounded-lg ${currentNotification.audience === audience.id ? "bg-gray-700" : "bg-gray-800"}`}
+                        onPress={() =>
+                          setCurrentNotification({
+                            ...currentNotification,
+                            audience: audience.id,
+                          })
+                        }
+                      >
+                        <Users size={16} color="#9CA3AF" />
+                        <Text className="text-white ml-1">{audience.name}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </View>
+
+                {/* Title */}
+                <View className="mb-4">
+                  <Text className="text-gray-300 mb-1">Title</Text>
+                  <View className="flex-row items-center bg-gray-800 rounded-lg px-3 py-2">
+                    <FileText size={18} color="#9CA3AF" />
+                    <TextInput
+                      className="flex-1 text-white ml-2"
+                      placeholder="Notification title"
+                      placeholderTextColor="#9CA3AF"
+                      value={currentNotification.title}
+                      onChangeText={(text) =>
+                        setCurrentNotification({
+                          ...currentNotification,
+                          title: text,
+                        })
+                      }
+                    />
+                  </View>
+                </View>
+
+                {/* Message */}
+                <View className="mb-4">
+                  <Text className="text-gray-300 mb-1">Message</Text>
+                  <View className="bg-gray-800 rounded-lg px-3 py-2">
+                    <TextInput
+                      className="text-white"
+                      placeholder="Notification message"
+                      placeholderTextColor="#9CA3AF"
+                      multiline
+                      numberOfLines={4}
+                      textAlignVertical="top"
+                      value={currentNotification.message}
+                      onChangeText={(text) =>
+                        setCurrentNotification({
+                          ...currentNotification,
+                          message: text,
+                        })
+                      }
+                    />
+                  </View>
+                </View>
+              </ScrollView>
+
+              <TouchableOpacity
+                className="bg-blue-600 rounded-lg py-3 items-center mt-4"
+                onPress={handleSendNotification}
+              >
+                <View className="flex-row items-center">
+                  <Send size={18} color="#FFFFFF" />
+                  <Text className="text-white font-bold ml-2">
+                    Send Notification
+                  </Text>
+                </View>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
+      </View>
+    </SafeAreaView>
+  );
+}
