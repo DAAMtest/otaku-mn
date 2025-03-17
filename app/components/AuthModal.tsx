@@ -8,7 +8,7 @@ import {
   Text,
   TouchableOpacity,
   ScrollView,
-  TextInput
+  TextInput,
 } from "react-native";
 import {
   X,
@@ -18,6 +18,8 @@ import {
   EyeOff,
   Github,
   Twitter,
+  User,
+  AlertCircle,
 } from "lucide-react-native";
 import { cn } from "@/lib/utils";
 
@@ -31,7 +33,7 @@ interface AuthModalProps {
 
 /**
  * Authentication modal component for login and registration
- * 
+ *
  * @param props - Component props
  * @returns AuthModal component
  */
@@ -47,33 +49,61 @@ const AuthModal = React.memo(function AuthModal({
   const [password, setPassword] = useState("");
   const [username, setUsername] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [errors, setErrors] = useState<{
+    email?: string;
+    password?: string;
+    username?: string;
+  }>({});
 
   const handleSubmit = () => {
-    // Basic validation
+    // Reset errors
+    setErrors({});
+    let newErrors: { email?: string; password?: string; username?: string } =
+      {};
+    let hasErrors = false;
+
+    // Email validation
+    if (!email.trim()) {
+      newErrors.email = "Email is required";
+      hasErrors = true;
+    } else if (!/\S+@\S+\.\S+/.test(email)) {
+      newErrors.email = "Please enter a valid email";
+      hasErrors = true;
+    }
+
+    // Password validation
+    if (!password) {
+      newErrors.password = "Password is required";
+      hasErrors = true;
+    } else if (!isLogin && password.length < 6) {
+      newErrors.password = "Password must be at least 6 characters";
+      hasErrors = true;
+    }
+
+    // Username validation for registration
+    if (!isLogin && !username.trim()) {
+      newErrors.username = "Username is required";
+      hasErrors = true;
+    }
+
+    if (hasErrors) {
+      setErrors(newErrors);
+      return;
+    }
+
+    // Proceed with authentication
     if (isLogin) {
-      if (!email.trim()) {
-        Alert.alert("Error", "Please enter your email");
-        return;
-      }
-      if (!password) {
-        Alert.alert("Error", "Please enter your password");
-        return;
-      }
       onLogin(email, password);
     } else {
-      if (!username.trim()) {
-        Alert.alert("Error", "Please enter a username");
-        return;
-      }
-      if (!email.trim()) {
-        Alert.alert("Error", "Please enter your email");
-        return;
-      }
-      if (password.length < 6) {
-        Alert.alert("Error", "Password must be at least 6 characters");
-        return;
-      }
       onRegister(email, password, username);
+    }
+
+    // Add haptic feedback on submit
+    try {
+      const Haptics = require("expo-haptics");
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } catch (error) {
+      // Haptics not available, continue silently
     }
   };
 
@@ -82,6 +112,15 @@ const AuthModal = React.memo(function AuthModal({
     setEmail("");
     setPassword("");
     setUsername("");
+    setErrors({});
+
+    // Add haptic feedback on mode toggle
+    try {
+      const Haptics = require("expo-haptics");
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    } catch (error) {
+      // Haptics not available, continue silently
+    }
   };
 
   if (!visible) return null;
@@ -110,7 +149,10 @@ const AuthModal = React.memo(function AuthModal({
                 className="p-2 rounded-full bg-neutral-800 dark:bg-neutral-700"
                 activeOpacity={0.7}
               >
-                <X size={18} className="text-neutral-400 dark:text-neutral-300" />
+                <X
+                  size={18}
+                  className="text-neutral-400 dark:text-neutral-300"
+                />
               </TouchableOpacity>
             </View>
 
@@ -119,59 +161,129 @@ const AuthModal = React.memo(function AuthModal({
               <View className="mb-4">
                 {!isLogin && (
                   <View className="mb-4">
-                    <Text className="text-neutral-400 dark:text-neutral-300 text-sm mb-2">Username</Text>
-                    <View className="flex-row items-center border border-neutral-800 dark:border-neutral-700 rounded-lg px-3 py-2 bg-neutral-900 dark:bg-neutral-800">
+                    <Text className="text-neutral-400 dark:text-neutral-300 text-sm mb-2">
+                      Username
+                    </Text>
+                    <View
+                      className={`flex-row items-center border ${errors.username ? "border-red-500" : "border-neutral-800 dark:border-neutral-700"} rounded-lg px-3 py-2 bg-neutral-900 dark:bg-neutral-800`}
+                    >
+                      <User
+                        size={18}
+                        className="text-neutral-500 dark:text-neutral-400"
+                      />
                       <TextInput
-                        className="flex-1 text-neutral-100 dark:text-white"
+                        className="flex-1 ml-2 text-neutral-100 dark:text-white"
                         placeholder="Your username"
                         placeholderTextColor="#6B7280"
                         value={username}
-                        onChangeText={setUsername}
+                        onChangeText={(text) => {
+                          setUsername(text);
+                          if (errors.username) {
+                            setErrors({ ...errors, username: undefined });
+                          }
+                        }}
                         autoCapitalize="none"
                       />
                     </View>
+                    {errors.username && (
+                      <View className="flex-row items-center mt-1">
+                        <AlertCircle size={12} color="#EF4444" />
+                        <Text className="text-red-500 text-xs ml-1">
+                          {errors.username}
+                        </Text>
+                      </View>
+                    )}
                   </View>
                 )}
 
                 <View className="mb-4">
-                  <Text className="text-neutral-400 dark:text-neutral-300 text-sm mb-2">Email</Text>
-                  <View className="flex-row items-center border border-neutral-800 dark:border-neutral-700 rounded-lg px-3 py-2 bg-neutral-900 dark:bg-neutral-800">
-                    <Mail size={18} className="text-neutral-500 dark:text-neutral-400" />
+                  <Text className="text-neutral-400 dark:text-neutral-300 text-sm mb-2">
+                    Email
+                  </Text>
+                  <View
+                    className={`flex-row items-center border ${errors.email ? "border-red-500" : "border-neutral-800 dark:border-neutral-700"} rounded-lg px-3 py-2 bg-neutral-900 dark:bg-neutral-800`}
+                  >
+                    <Mail
+                      size={18}
+                      className="text-neutral-500 dark:text-neutral-400"
+                    />
                     <TextInput
                       className="flex-1 ml-2 text-neutral-100 dark:text-white"
                       placeholder="your.email@example.com"
                       placeholderTextColor="#6B7280"
                       value={email}
-                      onChangeText={setEmail}
+                      onChangeText={(text) => {
+                        setEmail(text);
+                        if (errors.email) {
+                          setErrors({ ...errors, email: undefined });
+                        }
+                      }}
                       keyboardType="email-address"
                       autoCapitalize="none"
+                      autoComplete="email"
                     />
                   </View>
+                  {errors.email && (
+                    <View className="flex-row items-center mt-1">
+                      <AlertCircle size={12} color="#EF4444" />
+                      <Text className="text-red-500 text-xs ml-1">
+                        {errors.email}
+                      </Text>
+                    </View>
+                  )}
                 </View>
 
                 <View className="mb-6">
-                  <Text className="text-neutral-400 dark:text-neutral-300 text-sm mb-2">Password</Text>
-                  <View className="flex-row items-center border border-neutral-800 dark:border-neutral-700 rounded-lg px-3 py-2 bg-neutral-900 dark:bg-neutral-800">
-                    <Lock size={18} className="text-neutral-500 dark:text-neutral-400" />
+                  <Text className="text-neutral-400 dark:text-neutral-300 text-sm mb-2">
+                    Password
+                  </Text>
+                  <View
+                    className={`flex-row items-center border ${errors.password ? "border-red-500" : "border-neutral-800 dark:border-neutral-700"} rounded-lg px-3 py-2 bg-neutral-900 dark:bg-neutral-800`}
+                  >
+                    <Lock
+                      size={18}
+                      className="text-neutral-500 dark:text-neutral-400"
+                    />
                     <TextInput
                       className="flex-1 ml-2 text-neutral-100 dark:text-white"
                       placeholder="Your password"
                       placeholderTextColor="#6B7280"
                       value={password}
-                      onChangeText={setPassword}
+                      onChangeText={(text) => {
+                        setPassword(text);
+                        if (errors.password) {
+                          setErrors({ ...errors, password: undefined });
+                        }
+                      }}
                       secureTextEntry={!showPassword}
+                      autoComplete="password"
                     />
                     <TouchableOpacity
                       onPress={() => setShowPassword(!showPassword)}
                       activeOpacity={0.7}
+                      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                     >
                       {showPassword ? (
-                        <EyeOff size={18} className="text-neutral-500 dark:text-neutral-400" />
+                        <EyeOff
+                          size={18}
+                          className="text-neutral-500 dark:text-neutral-400"
+                        />
                       ) : (
-                        <Eye size={18} className="text-neutral-500 dark:text-neutral-400" />
+                        <Eye
+                          size={18}
+                          className="text-neutral-500 dark:text-neutral-400"
+                        />
                       )}
                     </TouchableOpacity>
                   </View>
+                  {errors.password && (
+                    <View className="flex-row items-center mt-1">
+                      <AlertCircle size={12} color="#EF4444" />
+                      <Text className="text-red-500 text-xs ml-1">
+                        {errors.password}
+                      </Text>
+                    </View>
+                  )}
                 </View>
 
                 {/* Submit Button */}

@@ -8,6 +8,7 @@ import AuthModal from "@/auth/components/AuthModal";
 import MenuDrawer from "@/components/MenuDrawer";
 import { useAuth } from "@/context/AuthContext";
 import type { Database } from "@/lib/database.types";
+import BottomNavigation from "@/components/BottomNavigation";
 
 type Tables = Database["public"]["Tables"];
 type Anime = Tables["anime"]["Row"] & {
@@ -23,18 +24,23 @@ export default function HomeScreen() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [username, setUsername] = useState("Guest");
   const [selectedGenres, setSelectedGenres] = useState<string[]>([]);
-  const [currentSortOrder, setCurrentSortOrder] = useState<"asc" | "desc">("desc");
+  const [currentSortOrder, setCurrentSortOrder] = useState<"asc" | "desc">(
+    "desc",
+  );
 
   // Define filter options
-  const filterOptions = useMemo(() => [
-    { id: "action", label: "Action", value: "Action" },
-    { id: "adventure", label: "Adventure", value: "Adventure" },
-    { id: "comedy", label: "Comedy", value: "Comedy" },
-    { id: "drama", label: "Drama", value: "Drama" },
-    { id: "fantasy", label: "Fantasy", value: "Fantasy" },
-    { id: "horror", label: "Horror", value: "Horror" },
-    { id: "scifi", label: "Sci-Fi", value: "Sci-Fi" }
-  ], []);
+  const filterOptions = useMemo(
+    () => [
+      { id: "action", label: "Action", value: "Action" },
+      { id: "adventure", label: "Adventure", value: "Adventure" },
+      { id: "comedy", label: "Comedy", value: "Comedy" },
+      { id: "drama", label: "Drama", value: "Drama" },
+      { id: "fantasy", label: "Fantasy", value: "Fantasy" },
+      { id: "horror", label: "Horror", value: "Horror" },
+      { id: "scifi", label: "Sci-Fi", value: "Sci-Fi" },
+    ],
+    [],
+  );
 
   // Get current route for bottom navigation
   const currentRoute = useMemo(() => {
@@ -49,7 +55,8 @@ export default function HomeScreen() {
     {
       id: "1",
       title: "Attack on Titan",
-      image_url: "https://images.unsplash.com/photo-1541562232579-512a21325720?w=400&q=80",
+      image_url:
+        "https://images.unsplash.com/photo-1541562232579-512a21325720?w=400&q=80",
       rating: 4.8,
       is_favorite: true,
       description: "Humanity's last stand against man-eating giants",
@@ -61,7 +68,8 @@ export default function HomeScreen() {
     {
       id: "2",
       title: "My Hero Academia",
-      image_url: "https://images.unsplash.com/photo-1560972550-aba3456b5564?w=400&q=80",
+      image_url:
+        "https://images.unsplash.com/photo-1560972550-aba3456b5564?w=400&q=80",
       rating: 4.6,
       is_favorite: false,
       description: "A quirkless boy's journey to become the greatest hero",
@@ -73,7 +81,8 @@ export default function HomeScreen() {
     {
       id: "3",
       title: "Demon Slayer",
-      image_url: "https://images.unsplash.com/photo-1578632767115-351597cf2477?w=400&q=80",
+      image_url:
+        "https://images.unsplash.com/photo-1578632767115-351597cf2477?w=400&q=80",
       rating: 4.9,
       is_favorite: true,
       description: "A young demon slayer avenges his family",
@@ -85,7 +94,8 @@ export default function HomeScreen() {
     {
       id: "4",
       title: "One Piece",
-      image_url: "https://images.unsplash.com/photo-1607604276583-eef5d076aa5f?w=400&q=80",
+      image_url:
+        "https://images.unsplash.com/photo-1607604276583-eef5d076aa5f?w=400&q=80",
       rating: 4.7,
       is_favorite: false,
       description: "Pirates search for the ultimate treasure",
@@ -97,10 +107,12 @@ export default function HomeScreen() {
     {
       id: "5",
       title: "Jujutsu Kaisen",
-      image_url: "https://images.unsplash.com/photo-1618336753974-aae8e04506aa?w=400&q=80",
+      image_url:
+        "https://images.unsplash.com/photo-1618336753974-aae8e04506aa?w=400&q=80",
       rating: 4.8,
       is_favorite: false,
-      description: "A high school student joins a secret organization of Jujutsu Sorcerers",
+      description:
+        "A high school student joins a secret organization of Jujutsu Sorcerers",
       release_date: "2020-10-03",
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
@@ -109,7 +121,8 @@ export default function HomeScreen() {
     {
       id: "6",
       title: "Naruto Shippuden",
-      image_url: "https://images.unsplash.com/photo-1601850494422-3cf14624b0b3?w=400&q=80",
+      image_url:
+        "https://images.unsplash.com/photo-1601850494422-3cf14624b0b3?w=400&q=80",
       rating: 4.5,
       is_favorite: true,
       description: "A ninja's quest to become the leader of his village",
@@ -121,10 +134,12 @@ export default function HomeScreen() {
     {
       id: "7",
       title: "Tokyo Ghoul",
-      image_url: "https://images.unsplash.com/photo-1612036782180-6f0b6cd846fe?w=400&q=80",
+      image_url:
+        "https://images.unsplash.com/photo-1612036782180-6f0b6cd846fe?w=400&q=80",
       rating: 4.3,
       is_favorite: false,
-      description: "A college student becomes half-ghoul after a fatal encounter",
+      description:
+        "A college student becomes half-ghoul after a fatal encounter",
       release_date: "2014-07-04",
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
@@ -133,7 +148,8 @@ export default function HomeScreen() {
     {
       id: "8",
       title: "Fullmetal Alchemist: Brotherhood",
-      image_url: "https://images.unsplash.com/photo-1614583225154-5fcdda07019e?w=400&q=80",
+      image_url:
+        "https://images.unsplash.com/photo-1614583225154-5fcdda07019e?w=400&q=80",
       rating: 4.9,
       is_favorite: true,
       description: "Two brothers seek the philosopher's stone",
@@ -309,45 +325,53 @@ export default function HomeScreen() {
   }, []);
 
   // Handle add to list
-  const handleAddToList = useCallback((anime: Anime) => {
-    if (!isAuthenticated) {
-      setShowAuthModal(true);
-      return;
-    }
+  const handleAddToList = useCallback(
+    (anime: Anime) => {
+      if (!isAuthenticated) {
+        setShowAuthModal(true);
+        return;
+      }
 
-    Alert.alert("Add to List", `Add "${anime.title}" to your list`, [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Watchlist",
-        onPress: () => console.log(`Added ${anime.id} to watchlist`),
-      },
-      {
-        text: "Favorites",
-        onPress: () => console.log(`Added ${anime.id} to favorites`),
-      },
-      {
-        text: "Currently Watching",
-        onPress: () => console.log(`Added ${anime.id} to currently watching`),
-      },
-    ]);
-  }, [isAuthenticated]);
+      Alert.alert("Add to List", `Add "${anime.title}" to your list`, [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Watchlist",
+          onPress: () => console.log(`Added ${anime.id} to watchlist`),
+        },
+        {
+          text: "Favorites",
+          onPress: () => console.log(`Added ${anime.id} to favorites`),
+        },
+        {
+          text: "Currently Watching",
+          onPress: () => console.log(`Added ${anime.id} to currently watching`),
+        },
+      ]);
+    },
+    [isAuthenticated],
+  );
 
   // Handle favorite toggle
-  const handleFavorite = useCallback((anime: Anime) => {
-    if (!isAuthenticated) {
-      setShowAuthModal(true);
-      return;
-    }
+  const handleFavorite = useCallback(
+    (anime: Anime) => {
+      if (!isAuthenticated) {
+        setShowAuthModal(true);
+        return;
+      }
 
-    setAnimeList((prevList) =>
-      prevList.map((item) =>
-        item.id === anime.id ? { ...item, is_favorite: !item.is_favorite } : item,
-      ),
-    );
+      setAnimeList((prevList) =>
+        prevList.map((item) =>
+          item.id === anime.id
+            ? { ...item, is_favorite: !item.is_favorite }
+            : item,
+        ),
+      );
 
-    const action = anime.is_favorite ? "removed from" : "added to";
-    Alert.alert("Favorites", `"${anime.title}" ${action} favorites`);
-  }, [isAuthenticated]);
+      const action = anime.is_favorite ? "removed from" : "added to";
+      Alert.alert("Favorites", `"${anime.title}" ${action} favorites`);
+    },
+    [isAuthenticated],
+  );
 
   // Handle filter change
   const handleFilterChange = (filters: string[]) => {
@@ -411,10 +435,10 @@ export default function HomeScreen() {
   const { user, isLoading: authLoading } = useAuth();
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: '#171717' }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: "#171717" }}>
       <StatusBar barStyle="light-content" backgroundColor="#171717" />
       <View style={{ flex: 1 }}>
-        <Header 
+        <Header
           title="AnimeTempo"
           showBack={false}
           showSearch={true}
@@ -423,21 +447,26 @@ export default function HomeScreen() {
           onSearchPress={handleSearchPress}
           onNotificationsPress={() => handleMenuItemPress("notifications")}
           onMenuPress={handleMenuPress}
+          notificationCount={3} // Example notification count
         />
         <FilterBar
-          filters={filterOptions.map(option => option.value)}
+          filters={filterOptions.map((option) => option.value)}
           selectedFilters={selectedGenres}
           onFilterPress={(filter) => {
             // Toggle the filter in the selectedGenres array
             if (selectedGenres.includes(filter)) {
-              handleFilterChange(selectedGenres.filter(genre => genre !== filter));
+              handleFilterChange(
+                selectedGenres.filter((genre) => genre !== filter),
+              );
             } else {
               handleFilterChange([...selectedGenres, filter]);
             }
           }}
           isLoading={isLoading}
         />
-        <View style={{ flex: 1, paddingBottom: Platform.OS === 'ios' ? 80 : 60 }}>
+        <View
+          style={{ flex: 1, paddingBottom: Platform.OS === "ios" ? 80 : 60 }}
+        >
           <AnimeGrid
             data={filteredAnimeList}
             loading={isLoading}
@@ -468,6 +497,7 @@ export default function HomeScreen() {
               : undefined
           }
         />
+        <BottomNavigation currentRoute={currentRoute} />
       </View>
     </SafeAreaView>
   );

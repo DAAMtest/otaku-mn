@@ -76,7 +76,9 @@ const FeaturedAnime = React.memo(function FeaturedAnime({
             {anime.genres && <GenreTags genres={anime.genres} />}
           </View>
 
-          <Text className="text-white font-bold text-xl mb-1">{anime.title}</Text>
+          <Text className="text-white font-bold text-xl mb-1">
+            {anime.title}
+          </Text>
 
           {anime.description && (
             <Text className="text-gray-300 text-xs" numberOfLines={2}>
@@ -99,9 +101,9 @@ const FeaturedAnime = React.memo(function FeaturedAnime({
             <TouchableOpacity
               className={cn(
                 "flex-row items-center rounded-full px-4 py-1.5",
-                anime.is_favorite 
-                  ? "bg-indigo-700 dark:bg-indigo-600" 
-                  : "bg-neutral-800 dark:bg-neutral-700"
+                anime.is_favorite
+                  ? "bg-indigo-700 dark:bg-indigo-600"
+                  : "bg-neutral-800 dark:bg-neutral-700",
               )}
               onPress={() => onAddToListPress?.(anime)}
               activeOpacity={0.8}
