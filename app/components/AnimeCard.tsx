@@ -1,108 +1,239 @@
-import React from "react";
-import { View, Text, TouchableOpacity, Image, Alert } from "react-native";
-import { Heart, Star, Plus, MoreHorizontal } from "lucide-react-native";
+import React, { useEffect, useRef } from "react";
+import { View, Image, TouchableOpacity, StyleSheet, Animated, Platform } from "react-native";
+import { Star, Heart } from "lucide-react-native";
+import { useTheme } from "@/context/ThemeProvider";
+import Typography from "./Typography";
 
 interface AnimeCardProps {
-  id?: string;
-  title?: string;
-  imageUrl?: string;
+  id: string;
+  title: string;
+  imageUrl: string;
   rating?: number;
-  onPress?: () => void;
-  onAddToList?: () => void;
-  onFavorite?: () => void;
   isFavorite?: boolean;
-  genres?: string[];
+  onPress?: () => void;
+  onFavoritePress?: () => void;
+  size?: "small" | "medium" | "large";
+  isLoading?: boolean;
 }
 
-const AnimeCard = React.memo(({
-  id = "1",
-  title = "Attack on Titan",
-  imageUrl = "https://images.unsplash.com/photo-1541562232579-512a21360020?w=400&q=80",
-  rating = 4.8,
-  onPress = () => {},
-  onAddToList = () => {},
-  onFavorite = () => {},
+/**
+ * AnimeCard component displays anime information in a card format
+ * with customizable size, interactive elements, and animations
+ */
+const AnimeCard = React.memo(function AnimeCard({
+  id,
+  title,
+  imageUrl,
+  rating = 0,
   isFavorite = false,
-  genres = ["Action", "Drama", "Fantasy"],
-}: AnimeCardProps) => {
-  // Handle image loading error
-  const [imageError, setImageError] = React.useState(false);
-  const fallbackImage = "https://images.unsplash.com/photo-1616530940355-351fabd9524b?w=400&q=80";
-  // Handle more options press
-  const handleMorePress = () => {
-    Alert.alert(title, "Select an option", [
-      { text: "Cancel", style: "cancel" },
-      { text: "View Details", onPress },
-      { text: "Add to List", onPress: onAddToList },
-      {
-        text: isFavorite ? "Remove from Favorites" : "Add to Favorites",
-        onPress: onFavorite,
-      },
-      {
-        text: "Share",
-        onPress: () => Alert.alert("Share", `Sharing ${title}`),
-      },
-    ]);
+  onPress,
+  onFavoritePress,
+  size = "medium",
+  isLoading = false,
+}: AnimeCardProps) {
+  const { colors } = useTheme();
+  const scaleAnim = useRef(new Animated.Value(1)).current;
+  
+  // Determine card dimensions based on size prop
+  const dimensions = {
+    small: { width: 120, height: 180 },
+    medium: { width: 150, height: 225 },
+    large: { width: 180, height: 270 },
   };
 
-  return (
-    <TouchableOpacity
-      className="w-[180px] h-[250px] bg-gray-800 rounded-lg overflow-hidden m-1 shadow-md"
-      onPress={onPress}
-      activeOpacity={0.7}
-    >
-      <Image
-        source={{ uri: imageError ? fallbackImage : imageUrl }}
-        className="w-full h-[170px]"
-        resizeMode="cover"
-        onError={() => setImageError(true)}
-      />
+  const { width, height } = dimensions[size];
+  
+  // Handle press animation
+  const handlePressIn = () => {
+    Animated.spring(scaleAnim, {
+      toValue: 0.95,
+      useNativeDriver: true,
+      speed: 20,
+      bounciness: 4,
+    }).start();
+  };
+  
+  const handlePressOut = () => {
+    Animated.spring(scaleAnim, {
+      toValue: 1,
+      useNativeDriver: true,
+      speed: 20,
+      bounciness: 4,
+    }).start();
+  };
+  
+  // Handle favorite button press with haptic feedback
+  const handleFavoritePress = () => {
+    // Add haptic feedback
+    try {
+      const Haptics = require("expo-haptics");
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    } catch (error) {
+      // Haptics not available, continue silently
+    }
+    
+    onFavoritePress?.();
+  };
 
-      <View className="p-2">
-        <Text className="text-white font-semibold text-sm" numberOfLines={2}>
-          {title}
-        </Text>
-
-        <View className="flex-row justify-between items-center mt-2">
-          <View className="flex-row items-center">
-            <Star size={14} color="#FFD700" fill="#FFD700" />
-            <Text className="text-white text-xs ml-1">{rating}</Text>
-          </View>
-
-          <View className="flex-row">
-            <TouchableOpacity
-              className="mr-2"
-              onPress={onAddToList}
-              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-            >
-              <Plus size={18} color="#FFFFFF" />
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              onPress={onFavorite}
-              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-            >
-              <Heart
-                size={18}
-                color="#FFFFFF"
-                fill={isFavorite ? "#FF6B6B" : "transparent"}
-              />
-            </TouchableOpacity>
-          </View>
+  // Skeleton loading state
+  if (isLoading) {
+    return (
+      <View 
+        style={[
+          styles.container, 
+          { 
+            width,
+            backgroundColor: colors.skeleton,
+            borderRadius: 8,
+            overflow: 'hidden',
+          }
+        ]}
+      >
+        <View 
+          style={[
+            styles.image, 
+            { 
+              width, 
+              height, 
+              backgroundColor: colors.skeleton 
+            }
+          ]} 
+        />
+        <View style={styles.titleContainer}>
+          <View 
+            style={[
+              styles.skeletonText, 
+              { 
+                backgroundColor: colors.cardHover,
+                width: width * 0.8,
+              }
+            ]} 
+          />
         </View>
       </View>
+    );
+  }
 
+  return (
+    <Animated.View
+      style={{
+        transform: [{ scale: scaleAnim }],
+      }}
+    >
       <TouchableOpacity
-        className="absolute top-2 right-2 bg-black/50 rounded-full p-1"
-        onPress={handleMorePress}
-        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+        onPress={onPress}
+        onPressIn={handlePressIn}
+        onPressOut={handlePressOut}
+        activeOpacity={0.9}
+        style={[styles.container, { width }]}
+        accessible={true}
+        accessibilityLabel={`${title}, Rating: ${rating}, ${isFavorite ? 'In favorites' : 'Not in favorites'}`}
+        accessibilityRole="button"
+        accessibilityHint="Opens anime details"
       >
-        <MoreHorizontal size={16} color="#FFFFFF" />
-      </TouchableOpacity>
-    </TouchableOpacity>
-  );
-};
+        <View style={styles.imageContainer}>
+          <Image
+            source={{ uri: imageUrl }}
+            style={[
+              styles.image, 
+              { width, height, backgroundColor: colors.background }
+            ]}
+            resizeMode="cover"
+            accessibilityIgnoresInvertColors={true}
+          />
 
-});  // Close memo
+          {/* Rating badge */}
+          {rating > 0 && (
+            <View style={[styles.ratingBadge, { backgroundColor: 'rgba(0,0,0,0.7)' }]}>
+              <Star size={12} color="#FFD700" style={styles.starIcon} />
+              <Typography 
+                variant="caption" 
+                color="#FFFFFF"
+                style={styles.ratingText}
+              >
+                {rating.toFixed(1)}
+              </Typography>
+            </View>
+          )}
+
+          {/* Favorite button */}
+          <TouchableOpacity
+            onPress={handleFavoritePress}
+            style={styles.favoriteButton}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            accessible={true}
+            accessibilityLabel={isFavorite ? 'Remove from favorites' : 'Add to favorites'}
+            accessibilityRole="button"
+          >
+            <Heart
+              size={16}
+              color={isFavorite ? colors.secondary : "#FFFFFF"}
+              fill={isFavorite ? colors.secondary : "none"}
+            />
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.titleContainer}>
+          <Typography
+            variant="bodySmall"
+            numberOfLines={2}
+            color={colors.text}
+            weight="500"
+          >
+            {title}
+          </Typography>
+        </View>
+      </TouchableOpacity>
+    </Animated.View>
+  );
+});
+
+const styles = StyleSheet.create({
+  container: {
+    borderRadius: 8,
+    overflow: 'hidden',
+    marginBottom: 12,
+    backgroundColor: 'transparent',
+  },
+  imageContainer: {
+    position: 'relative',
+  },
+  image: {
+    borderRadius: 8,
+  },
+  ratingBadge: {
+    position: 'absolute',
+    top: 8,
+    left: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 20,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  starIcon: {
+    marginRight: 4,
+  },
+  ratingText: {
+    fontWeight: '500',
+  },
+  favoriteButton: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    borderRadius: 20,
+    padding: 6,
+  },
+  titleContainer: {
+    marginTop: 8,
+    paddingHorizontal: 4,
+  },
+  skeletonText: {
+    height: 14,
+    borderRadius: 4,
+    marginVertical: 2,
+  },
+});
 
 export default AnimeCard;

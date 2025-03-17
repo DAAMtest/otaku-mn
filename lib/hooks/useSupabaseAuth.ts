@@ -1,12 +1,22 @@
+'use client';
+
 import { useState, useEffect } from "react";
-import { supabase } from "../lib/supabase";
-import { Session } from "@supabase/supabase-js";
+import { supabase } from "@/lib/supabase";
+import { Session, AuthError, User, AuthResponse } from "@supabase/supabase-js";
 
 export interface AuthUser {
   id: string;
   email?: string;
   username?: string;
   avatarUrl?: string;
+}
+
+export interface AuthData {
+  data: {
+    user: User | null;
+    session: Session | null;
+  } | null;
+  error: AuthError | null;
 }
 
 export function useSupabaseAuth() {
@@ -23,7 +33,7 @@ export function useSupabaseAuth() {
         if (data.session) {
           setUser({
             id: data.session.user.id,
-            email: data.session.user.email,
+            email: data.session.user.email ?? undefined,
           });
         }
         setLoading(false);
@@ -36,14 +46,12 @@ export function useSupabaseAuth() {
     getInitialSession();
 
     // Listen for auth changes
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event: string, session: Session | null) => {
       setSession(session);
       if (session) {
         setUser({
           id: session.user.id,
-          email: session.user.email,
+          email: session.user.email ?? undefined,
         });
       } else {
         setUser(null);
@@ -60,31 +68,6 @@ export function useSupabaseAuth() {
       fetchUserProfile(user.id);
     }
   }, [user?.id]);
-
-  // Set up auth state change listener
-  useEffect(() => {
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log(`Supabase auth event: ${event}`);
-      if (event === "SIGNED_IN" || event === "TOKEN_REFRESHED") {
-        setSession(session);
-        if (session) {
-          setUser({
-            id: session.user.id,
-            email: session.user.email,
-          });
-        }
-      } else if (event === "SIGNED_OUT") {
-        setSession(null);
-        setUser(null);
-      }
-    });
-
-    return () => {
-      subscription.unsubscribe();
-    };
-  }, []);
 
   const fetchUserProfile = async (userId: string) => {
     try {
@@ -111,7 +94,7 @@ export function useSupabaseAuth() {
     }
   };
 
-  const signIn = async (email: string, password: string) => {
+  const signIn = async (email: string, password: string): Promise<AuthData> => {
     try {
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
@@ -121,11 +104,11 @@ export function useSupabaseAuth() {
       if (error) throw error;
       return { data, error: null };
     } catch (error) {
-      return { data: null, error };
+      return { data: null, error: error as AuthError };
     }
   };
 
-  const signUp = async (email: string, password: string, username: string) => {
+  const signUp = async (email: string, password: string, username: string): Promise<AuthData> => {
     try {
       // Sign up the user
       const { data, error } = await supabase.auth.signUp({
@@ -148,17 +131,17 @@ export function useSupabaseAuth() {
 
       return { data, error: null };
     } catch (error) {
-      return { data: null, error };
+      return { data: null, error: error as AuthError };
     }
   };
 
-  const signOut = async () => {
+  const signOut = async (): Promise<{ error: AuthError | null }> => {
     try {
       const { error } = await supabase.auth.signOut();
       if (error) throw error;
       return { error: null };
     } catch (error) {
-      return { error };
+      return { error: error as AuthError };
     }
   };
 
@@ -171,5 +154,3 @@ export function useSupabaseAuth() {
     signOut,
   };
 }
-
-export default useSupabaseAuth;

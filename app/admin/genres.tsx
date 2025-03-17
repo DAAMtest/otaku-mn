@@ -19,236 +19,212 @@ import {
   Edit,
   Trash2,
   X,
-  Save,
   Tag,
   Film,
 } from "lucide-react-native";
-import { supabase } from "../lib/supabase";
-import { useAuth } from "../context/AuthContext";
+import { supabase } from '@lib/supabase';
+import { useAuth } from '@context/AuthContext';
+import type { Database } from '@lib/database.types';
 
-interface Genre {
-  id: string;
-  name: string;
-  created_at: string;
+type Tables = Database['public']['Tables'];
+type Genre = Tables['genres']['Row'] & {
   anime_count?: number;
+};
+
+interface CountResult {
+  genre_id: string;
+  count: number;
 }
 
+/**
+ * Genre management screen for administrators.
+ * Allows CRUD operations on anime genres with proper error handling.
+ */
 export default function GenreManagement() {
   const router = useRouter();
-  const { user } = useAuth();
-  const [genreList, setGenreList] = useState<Genre[]>([]);
-  const [filteredGenreList, setFilteredGenreList] = useState<Genre[]>([]);
-  const [searchQuery, setSearchQuery] = useState("");
+  const { session } = useAuth();
+  const [genres, setGenres] = useState<Genre[]>([]);
   const [loading, setLoading] = useState(true);
-  const [modalVisible, setModalVisible] = useState(false);
-  const [editMode, setEditMode] = useState(false);
-  const [currentGenre, setCurrentGenre] = useState<Genre>({
-    id: "",
-    name: "",
-    created_at: new Date().toISOString(),
-  });
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isModalVisible, setIsModalVisible] = useState(false);
+  const [editingGenre, setEditingGenre] = useState<Genre | null>(null);
+  const [genreName, setGenreName] = useState('');
+  const [description, setDescription] = useState('');
 
-  // Fetch genre list on component mount
   useEffect(() => {
-    fetchGenreList();
-  }, []);
-
-  // Filter genre list when search query changes
-  useEffect(() => {
-    if (searchQuery.trim() === "") {
-      setFilteredGenreList(genreList);
-    } else {
-      const filtered = genreList.filter((genre) =>
-        genre.name.toLowerCase().includes(searchQuery.toLowerCase()),
-      );
-      setFilteredGenreList(filtered);
+    if (!session) {
+      router.replace('/');
+      return;
     }
-  }, [searchQuery, genreList]);
+    fetchGenres();
+  }, [session]);
 
-  // Fetch genre list from Supabase
-  const fetchGenreList = async () => {
-    setLoading(true);
+  const fetchGenres = async () => {
     try {
-      // First get all genres
-      const { data: genreData, error: genreError } = await supabase
-        .from("genres")
-        .select("*")
-        .order("name");
+      setLoading(true);
+      const { data: genres, error: genresError } = await supabase
+        .from('genres')
+        .select('*')
+        .order('name');
+      
+      if (genresError) throw genresError;
 
-      if (genreError) throw genreError;
+      // Fetch anime counts for each genre
+      const { data: counts, error: countsError } = await supabase
+        .rpc('get_genre_anime_counts');
 
-      // Then get anime count for each genre
-      const { data: countData, error: countError } = await supabase
-        .from("anime_genres")
-        .select("genre_id, count", { count: "exact" })
-        .group("genre_id");
+      if (countsError) throw countsError;
 
-      if (countError) throw countError;
-
-      // Create a map of genre_id to count
-      const countMap = new Map();
-      countData.forEach((item) => {
-        countMap.set(item.genre_id, parseInt(item.count));
-      });
-
-      // Combine the data
-      const combinedData = genreData.map((genre) => ({
+      const genresWithCounts = genres.map((genre: Genre) => ({
         ...genre,
-        anime_count: countMap.get(genre.id) || 0,
+        anime_count: (counts as CountResult[]).find(
+          count => count.genre_id === genre.id
+        )?.count || 0,
       }));
 
-      setGenreList(combinedData);
-      setFilteredGenreList(combinedData);
+      setGenres(genresWithCounts);
     } catch (error) {
-      console.error("Error fetching genres:", error);
-      Alert.alert("Error", "Failed to fetch genre list");
+      console.error('Error fetching genres:', error);
+      Alert.alert('Error', 'Failed to fetch genres');
     } finally {
       setLoading(false);
     }
   };
 
-  // Handle back button press
-  const handleBackPress = () => {
-    router.back();
-  };
-
-  // Handle add new genre
-  const handleAddGenre = () => {
-    setEditMode(false);
-    setCurrentGenre({
-      id: "",
-      name: "",
-      created_at: new Date().toISOString(),
-    });
-    setModalVisible(true);
-  };
-
-  // Handle edit genre
-  const handleEditGenre = (genre: Genre) => {
-    setEditMode(true);
-    setCurrentGenre(genre);
-    setModalVisible(true);
-  };
-
-  // Handle delete genre
-  const handleDeleteGenre = (id: string, name: string, animeCount: number) => {
-    if (animeCount > 0) {
-      Alert.alert(
-        "Cannot Delete",
-        `The genre "${name}" is associated with ${animeCount} anime. Remove these associations first.`,
-      );
-      return;
-    }
-
-    Alert.alert(
-      "Delete Genre",
-      `Are you sure you want to delete the genre "${name}"?`,
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Delete",
-          onPress: async () => {
-            try {
-              const { error } = await supabase
-                .from("genres")
-                .delete()
-                .eq("id", id);
-
-              if (error) throw error;
-
-              // Update the local state
-              setGenreList(genreList.filter((genre) => genre.id !== id));
-              Alert.alert("Success", "Genre deleted successfully");
-            } catch (error) {
-              console.error("Error deleting genre:", error);
-              Alert.alert("Error", "Failed to delete genre");
-            }
-          },
-          style: "destructive",
-        },
-      ],
-    );
-  };
-
-  // Handle save genre
-  const handleSaveGenre = async () => {
-    // Validate form
-    if (!currentGenre.name.trim()) {
-      Alert.alert("Error", "Genre name is required");
-      return;
-    }
-
+  const handleAddGenre = async () => {
     try {
-      if (editMode) {
-        // Update existing genre
-        const { error } = await supabase
-          .from("genres")
-          .update({
-            name: currentGenre.name,
-          })
-          .eq("id", currentGenre.id);
-
-        if (error) throw error;
-      } else {
-        // Insert new genre
-        const { error } = await supabase.from("genres").insert({
-          name: currentGenre.name,
-        });
-
-        if (error) throw error;
+      if (!genreName.trim()) {
+        Alert.alert('Error', 'Genre name is required');
+        return;
       }
 
-      // Refresh genre list
-      await fetchGenreList();
-      setModalVisible(false);
-      Alert.alert(
-        "Success",
-        editMode ? "Genre updated successfully" : "Genre added successfully",
-      );
+      const { data, error } = await supabase
+        .from('genres')
+        .insert([{ 
+          name: genreName.trim(), 
+          description: description.trim() || null,
+          updated_at: new Date().toISOString(),
+        }])
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      setGenres([...genres, { ...data, anime_count: 0 }]);
+      setIsModalVisible(false);
+      setGenreName('');
+      setDescription('');
     } catch (error) {
-      console.error("Error saving genre:", error);
-      Alert.alert("Error", "Failed to save genre");
+      console.error('Error adding genre:', error);
+      Alert.alert('Error', 'Failed to add genre');
     }
   };
 
-  // Render genre item
-  const renderGenreItem = ({ item }: { item: Genre }) => (
-    <View className="flex-row bg-gray-800 rounded-lg p-4 mb-3 items-center">
-      <View
-        className="w-10 h-10 rounded-full items-center justify-center mr-3"
-        style={{ backgroundColor: "#8b5cf620" }}
-      >
-        <Tag size={18} color="#A78BFA" />
-      </View>
+  const handleEditGenre = async () => {
+    try {
+      if (!editingGenre || !genreName.trim()) {
+        Alert.alert('Error', 'Genre name is required');
+        return;
+      }
 
+      const { error } = await supabase
+        .from('genres')
+        .update({ 
+          name: genreName.trim(), 
+          description: description.trim() || null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', editingGenre.id);
+
+      if (error) throw error;
+
+      setGenres(genres.map(genre => 
+        genre.id === editingGenre.id
+          ? { 
+              ...genre, 
+              name: genreName.trim(), 
+              description: description.trim() || null,
+              updated_at: new Date().toISOString(),
+            }
+          : genre
+      ));
+      setIsModalVisible(false);
+      setEditingGenre(null);
+      setGenreName('');
+      setDescription('');
+    } catch (error) {
+      console.error('Error updating genre:', error);
+      Alert.alert('Error', 'Failed to update genre');
+    }
+  };
+
+  const handleDeleteGenre = async (genre: Genre) => {
+    try {
+      if (genre.anime_count && genre.anime_count > 0) {
+        Alert.alert(
+          'Cannot Delete',
+          `This genre is associated with ${genre.anime_count} anime. Please remove these associations first.`
+        );
+        return;
+      }
+
+      const { error } = await supabase
+        .from('genres')
+        .delete()
+        .eq('id', genre.id);
+
+      if (error) throw error;
+
+      setGenres(genres.filter(g => g.id !== genre.id));
+    } catch (error) {
+      console.error('Error deleting genre:', error);
+      Alert.alert('Error', 'Failed to delete genre');
+    }
+  };
+
+  const filteredGenres = genres.filter(genre =>
+    genre.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    genre.description?.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  const renderItem = ({ item: genre }: { item: Genre }) => (
+    <View className="flex-row items-center justify-between bg-gray-800 rounded-lg p-4 mb-2">
       <View className="flex-1">
-        <Text className="text-white font-semibold text-base">{item.name}</Text>
-        <View className="flex-row items-center mt-1">
-          <Film size={14} color="#9CA3AF" />
-          <Text className="text-gray-400 text-xs ml-1">
-            {item.anime_count} anime
-          </Text>
+        <Text className="text-white text-lg font-semibold">{genre.name}</Text>
+        {genre.description && (
+          <Text className="text-gray-400 mt-1">{genre.description}</Text>
+        )}
+        <View className="flex-row items-center mt-2">
+          <Film size={16} color="#9CA3AF" />
+          <Text className="text-gray-400 ml-1">{genre.anime_count} anime</Text>
         </View>
       </View>
-
-      <View className="flex-row">
+      <View className="flex-row items-center">
         <TouchableOpacity
-          className="bg-blue-600/30 p-2 rounded-full mr-2"
-          onPress={() => handleEditGenre(item)}
+          onPress={() => {
+            setEditingGenre(genre);
+            setGenreName(genre.name);
+            setDescription(genre.description || '');
+            setIsModalVisible(true);
+          }}
+          className="p-2"
         >
-          <Edit size={16} color="#60A5FA" />
+          <Edit size={20} color="#60A5FA" />
         </TouchableOpacity>
         <TouchableOpacity
-          className="bg-red-600/30 p-2 rounded-full"
-          onPress={() =>
-            handleDeleteGenre(item.id, item.name, item.anime_count || 0)
-          }
-          disabled={item.anime_count && item.anime_count > 0}
-          style={{
-            opacity: item.anime_count && item.anime_count > 0 ? 0.5 : 1,
+          onPress={() => {
+            Alert.alert(
+              'Delete Genre',
+              `Are you sure you want to delete "${genre.name}"?`,
+              [
+                { text: 'Cancel', style: 'cancel' },
+                { text: 'Delete', onPress: () => handleDeleteGenre(genre), style: 'destructive' }
+              ]
+            );
           }}
+          className="p-2"
         >
-          <Trash2 size={16} color="#F87171" />
+          <Trash2 size={20} color="#EF4444" />
         </TouchableOpacity>
       </View>
     </View>
@@ -256,118 +232,110 @@ export default function GenreManagement() {
 
   return (
     <SafeAreaView className="flex-1 bg-gray-900">
-      <StatusBar barStyle="light-content" backgroundColor="#111827" />
-      <View className="flex-1">
-        {/* Header */}
-        <View className="w-full h-[60px] bg-gray-900 flex-row items-center justify-between px-4 border-b border-gray-800">
-          <TouchableOpacity onPress={handleBackPress}>
-            <ArrowLeft size={24} color="#FFFFFF" />
-          </TouchableOpacity>
-          <Text className="text-white font-bold text-lg">Genre Management</Text>
-          <TouchableOpacity onPress={handleAddGenre}>
-            <Plus size={24} color="#FFFFFF" />
-          </TouchableOpacity>
-        </View>
+      <StatusBar barStyle="light-content" />
+      <View className="flex-row items-center p-4 border-b border-gray-800">
+        <TouchableOpacity onPress={() => router.back()} className="mr-4">
+          <ArrowLeft size={24} color="#fff" />
+        </TouchableOpacity>
+        <Text className="text-white text-xl font-semibold">Manage Genres</Text>
+      </View>
 
-        {/* Search Bar */}
-        <View className="p-4">
-          <View className="flex-row items-center bg-gray-800 rounded-lg px-3 py-2">
-            <Search size={20} color="#9CA3AF" />
-            <TextInput
-              className="flex-1 text-white ml-2"
-              placeholder="Search genres..."
-              placeholderTextColor="#9CA3AF"
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-            />
-            {searchQuery.length > 0 && (
-              <TouchableOpacity onPress={() => setSearchQuery("")}>
-                <X size={18} color="#9CA3AF" />
-              </TouchableOpacity>
-            )}
-          </View>
-        </View>
-
-        {/* Genre List */}
-        {loading ? (
-          <View className="flex-1 items-center justify-center">
-            <ActivityIndicator size="large" color="#6366F1" />
-            <Text className="text-gray-400 mt-4">Loading genres...</Text>
-          </View>
-        ) : (
-          <FlatList
-            data={filteredGenreList}
-            renderItem={renderGenreItem}
-            keyExtractor={(item) => item.id}
-            contentContainerStyle={{ padding: 16 }}
-            ListEmptyComponent={
-              <View className="flex-1 items-center justify-center py-10">
-                <Text className="text-gray-400 text-lg">
-                  {searchQuery
-                    ? "No genres found matching your search"
-                    : "No genres available"}
-                </Text>
-                <TouchableOpacity
-                  className="mt-4 bg-blue-600 px-4 py-2 rounded-lg"
-                  onPress={handleAddGenre}
-                >
-                  <Text className="text-white">Add New Genre</Text>
-                </TouchableOpacity>
-              </View>
-            }
+      <View className="flex-row items-center p-4">
+        <View className="flex-1 flex-row items-center bg-gray-800 rounded-lg px-4 py-2 mr-2">
+          <Search size={20} color="#9CA3AF" />
+          <TextInput
+            placeholder="Search genres..."
+            placeholderTextColor="#9CA3AF"
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            className="flex-1 ml-2 text-white"
           />
-        )}
-
-        {/* Add/Edit Genre Modal */}
-        <Modal
-          visible={modalVisible}
-          transparent
-          animationType="slide"
-          onRequestClose={() => setModalVisible(false)}
+        </View>
+        <TouchableOpacity
+          onPress={() => {
+            setEditingGenre(null);
+            setGenreName('');
+            setDescription('');
+            setIsModalVisible(true);
+          }}
+          className="bg-indigo-600 p-2 rounded-lg"
         >
-          <View className="flex-1 justify-center items-center bg-black/70">
-            <View className="w-[90%] bg-gray-900 rounded-xl p-4">
-              <View className="flex-row justify-between items-center mb-4">
-                <Text className="text-white text-xl font-bold">
-                  {editMode ? "Edit Genre" : "Add New Genre"}
-                </Text>
-                <TouchableOpacity onPress={() => setModalVisible(false)}>
-                  <X size={24} color="#FFFFFF" />
-                </TouchableOpacity>
-              </View>
+          <Plus size={24} color="#fff" />
+        </TouchableOpacity>
+      </View>
 
-              {/* Genre Name */}
-              <View className="mb-4">
-                <Text className="text-gray-300 mb-1">Genre Name</Text>
-                <View className="flex-row items-center bg-gray-800 rounded-lg px-3 py-2">
-                  <Tag size={18} color="#9CA3AF" />
-                  <TextInput
-                    className="flex-1 text-white ml-2"
-                    placeholder="Enter genre name"
-                    placeholderTextColor="#9CA3AF"
-                    value={currentGenre.name}
-                    onChangeText={(text) =>
-                      setCurrentGenre({ ...currentGenre, name: text })
-                    }
-                  />
-                </View>
-              </View>
+      {loading ? (
+        <View className="flex-1 items-center justify-center">
+          <ActivityIndicator size="large" color="#60A5FA" />
+        </View>
+      ) : (
+        <FlatList
+          data={filteredGenres}
+          renderItem={renderItem}
+          keyExtractor={genre => genre.id}
+          contentContainerClassName="p-4"
+          ListEmptyComponent={
+            <View className="items-center justify-center py-8">
+              <Tag size={48} color="#4B5563" />
+              <Text className="text-gray-400 text-lg mt-4">
+                {searchQuery
+                  ? 'No genres found matching your search'
+                  : 'No genres added yet'}
+              </Text>
+            </View>
+          }
+        />
+      )}
 
+      <Modal
+        visible={isModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setIsModalVisible(false)}
+      >
+        <View className="flex-1 bg-black/50 justify-center items-center p-4">
+          <View className="bg-gray-800 w-full max-w-sm rounded-lg p-6">
+            <View className="flex-row justify-between items-center mb-4">
+              <Text className="text-white text-xl font-semibold">
+                {editingGenre ? 'Edit Genre' : 'Add Genre'}
+              </Text>
               <TouchableOpacity
-                className="bg-blue-600 rounded-lg py-3 items-center mt-4"
-                onPress={handleSaveGenre}
+                onPress={() => setIsModalVisible(false)}
+                className="p-2"
               >
-                <View className="flex-row items-center">
-                  <Save size={18} color="#FFFFFF" />
-                  <Text className="text-white font-bold ml-2">
-                    {editMode ? "Update Genre" : "Add Genre"}
-                  </Text>
-                </View>
+                <X size={20} color="#9CA3AF" />
               </TouchableOpacity>
             </View>
+
+            <TextInput
+              placeholder="Genre name"
+              placeholderTextColor="#9CA3AF"
+              value={genreName}
+              onChangeText={setGenreName}
+              className="bg-gray-700 text-white px-4 py-3 rounded-lg mb-4"
+            />
+
+            <TextInput
+              placeholder="Description (optional)"
+              placeholderTextColor="#9CA3AF"
+              value={description}
+              onChangeText={setDescription}
+              multiline
+              numberOfLines={3}
+              className="bg-gray-700 text-white px-4 py-3 rounded-lg mb-4"
+            />
+
+            <TouchableOpacity
+              onPress={editingGenre ? handleEditGenre : handleAddGenre}
+              className="bg-indigo-600 py-3 rounded-lg"
+            >
+              <Text className="text-white text-center font-semibold">
+                {editingGenre ? 'Save Changes' : 'Add Genre'}
+              </Text>
+            </TouchableOpacity>
           </View>
-        </Modal>
-      </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }

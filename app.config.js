@@ -1,7 +1,7 @@
 module.exports = {
   expo: {
-    name: "Otaku Mongolia",
-    slug: "otaku-mongolia",
+    name: "AnimetempO",
+    slug: "animetempo",
     version: "1.0.0",
     orientation: "portrait",
     icon: "./assets/images/icon.png",
@@ -26,11 +26,13 @@ module.exports = {
       bundler: "metro",
     },
     extra: {
+      supabaseUrl: process.env.EXPO_PUBLIC_SUPABASE_URL,
+      supabaseAnonKey: process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY,
+      eas: {
+        projectId: "animetempo",
+      },
       // Increase the file watcher limit to prevent EMFILE errors
       watcherMaxFiles: 10000,
-      eas: {
-        projectId: "otaku-mongolia",
-      },
     },
     plugins: [
       [
@@ -39,6 +41,7 @@ module.exports = {
           asyncRoutes: true,
         },
       ],
+      "expo-secure-store"
     ],
     // Optimize Metro packager options
     packagerOpts: {
@@ -46,5 +49,6 @@ module.exports = {
       maxWorkers: 2,
       config: "metro.config.js",
     },
+    scheme: "animetempo",
   },
 };

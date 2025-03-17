@@ -10,6 +10,7 @@ export interface Anime {
   genres?: string[];
   description?: string;
   releaseDate?: string;
+  type?: string;
 }
 
 export function useAnimeSearch(userId: string | null) {
@@ -77,7 +78,7 @@ export function useAnimeSearch(userId: string | null) {
   // Simple debounce function
   function debounce(func: Function, wait: number) {
     let timeout: NodeJS.Timeout;
-    return function (...args: any[]) {
+    return function (this: any, ...args: any[]) {
       clearTimeout(timeout);
       timeout = setTimeout(() => func.apply(this, args), wait);
     };

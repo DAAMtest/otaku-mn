@@ -65,17 +65,23 @@ export interface Database {
         Row: {
           id: string;
           name: string;
+          description: string | null;
           created_at: string;
+          updated_at: string | null;
         };
         Insert: {
           id?: string;
           name: string;
+          description?: string | null;
           created_at?: string;
+          updated_at?: string | null;
         };
         Update: {
           id?: string;
           name?: string;
+          description?: string | null;
           created_at?: string;
+          updated_at?: string | null;
         };
       };
       user_anime_lists: {
@@ -161,7 +167,13 @@ export interface Database {
       [_ in never]: never;
     };
     Functions: {
-      [_ in never]: never;
+      get_genre_anime_counts: {
+        Args: Record<PropertyKey, never>;
+        Returns: Array<{
+          genre_id: string;
+          count: number;
+        }>;
+      };
     };
     Enums: {
       [_ in never]: never;

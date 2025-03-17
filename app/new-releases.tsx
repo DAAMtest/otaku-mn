@@ -15,138 +15,81 @@ import FilterBar from "./components/FilterBar";
 import useAnimeData from "./hooks/useAnimeData";
 import { useAuth } from "./context/AuthContext";
 import useAnimeLists from "./hooks/useAnimeLists";
-import AuthModal from "./components/AuthModal";
+import AuthModal from "./auth/components/AuthModal";
+import type { Database } from "@/lib/database.types";
+
+// Define the Anime type to match AnimeGrid's expected type
+type Tables = Database["public"]["Tables"];
+type AnimeGridItem = Tables["anime"]["Row"] & {
+  is_favorite?: boolean;
+  genres?: string[];
+  type?: string;
+};
 
 export default function NewReleasesScreen() {
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, isLoading } = useAuth();
   const { newReleases, loading, error, fetchNewReleases } = useAnimeData();
   const { addToList } = useAnimeLists(user?.id || null);
 
   const [activeTab, setActiveTab] = useState("home");
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [selectedGenres, setSelectedGenres] = useState<string[]>([]);
-  const [filteredAnime, setFilteredAnime] = useState(newReleases);
+  const [filteredAnime, setFilteredAnime] = useState<AnimeGridItem[]>([]);
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
+  const [selectedFilters, setSelectedFilters] = useState<string[]>([]);
 
   // Fetch new releases on component mount
   useEffect(() => {
     fetchNewReleases();
-  }, []);
+  }, [fetchNewReleases]);
 
-  // Apply filters and sorting
+  // Update filtered anime when newReleases, selectedGenres, or sortOrder changes
   useEffect(() => {
-    if (!newReleases) return;
-
-    let result = [...newReleases];
+    // Convert newReleases to AnimeGridItem format
+    const convertedReleases: AnimeGridItem[] = newReleases.map(anime => ({
+      id: anime.id,
+      title: anime.title,
+      image_url: anime.imageUrl,
+      rating: anime.rating || null,
+      description: anime.description || null,
+      release_date: anime.releaseDate || null,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      is_favorite: anime.isFavorite
+    }));
+    
+    let result = [...convertedReleases];
 
     // Apply genre filters if any are selected
     if (selectedGenres.length > 0) {
       result = result.filter((anime) =>
-        anime.genres?.some((genre) => selectedGenres.includes(genre)),
+        anime.genres?.some((genre: string) => selectedGenres.includes(genre)),
+      );
+    }
+
+    // Apply filters
+    if (selectedFilters.length > 0) {
+      result = result.filter((anime) =>
+        selectedFilters.includes("All") || (anime.type && selectedFilters.includes(anime.type))
       );
     }
 
     // Apply sorting
     result.sort((a, b) => {
       if (sortOrder === "asc") {
-        return a.rating - b.rating;
+        return (a.rating || 0) - (b.rating || 0);
       } else {
-        return b.rating - a.rating;
+        return (b.rating || 0) - (a.rating || 0);
       }
     });
 
     setFilteredAnime(result);
-  }, [newReleases, selectedGenres, sortOrder]);
+  }, [newReleases, selectedGenres, selectedFilters, sortOrder]);
 
   // Handle back button press
   const handleBackPress = () => {
     router.back();
-  };
-
-  // Handle anime press
-  const handleAnimePress = (id: string) => {
-    Alert.alert("Anime Details", `Viewing details for anime ID: ${id}`);
-    // Navigate to anime details in a real app
-    // router.push(`/anime/${id}`);
-  };
-
-  // Handle add to list
-  const handleAddToList = (id: string) => {
-    if (!user) {
-      setShowAuthModal(true);
-      return;
-    }
-
-    const anime = newReleases.find((item) => item.id === id);
-    if (anime) {
-      Alert.alert("Add to List", `Add "${anime.title}" to your list`, [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Watchlist",
-          onPress: async () => {
-            const { error } = await addToList(id, "watchlist");
-            if (error) {
-              Alert.alert(
-                "Error",
-                `Failed to add to watchlist: ${error.message}`,
-              );
-            } else {
-              Alert.alert("Success", `Added ${anime.title} to watchlist`);
-            }
-          },
-        },
-        {
-          text: "Currently Watching",
-          onPress: async () => {
-            const { error } = await addToList(id, "watching", 0);
-            if (error) {
-              Alert.alert(
-                "Error",
-                `Failed to add to watching: ${error.message}`,
-              );
-            } else {
-              Alert.alert(
-                "Success",
-                `Added ${anime.title} to currently watching`,
-              );
-            }
-          },
-        },
-        {
-          text: "Favorites",
-          onPress: async () => {
-            const { error } = await addToList(id, "favorites");
-            if (error) {
-              Alert.alert(
-                "Error",
-                `Failed to add to favorites: ${error.message}`,
-              );
-            } else {
-              Alert.alert("Success", `Added ${anime.title} to favorites`);
-            }
-          },
-        },
-      ]);
-    }
-  };
-
-  // Handle favorite toggle
-  const handleFavorite = async (id: string) => {
-    if (!user) {
-      setShowAuthModal(true);
-      return;
-    }
-
-    const anime = newReleases.find((item) => item.id === id);
-    if (anime) {
-      const { error } = await addToList(id, "favorites");
-      if (error) {
-        Alert.alert("Error", `Failed to add to favorites: ${error.message}`);
-      } else {
-        Alert.alert("Success", `Added ${anime.title} to favorites`);
-      }
-    }
   };
 
   // Handle filter change
@@ -159,71 +102,137 @@ export default function NewReleasesScreen() {
     setSortOrder(order);
   };
 
-  // Handle login
-  const handleLogin = async (email: string, password: string) => {
-    // This would use your auth hook in a real implementation
-    setShowAuthModal(false);
-    Alert.alert("Login", "Login functionality would be implemented here");
+  // Handle anime press
+  const handleAnimePress = (anime: AnimeGridItem) => {
+    Alert.alert("Anime Details", `Viewing details for ${anime.title}`);
   };
 
-  // Handle register
-  const handleRegister = async (
-    email: string,
-    password: string,
-    username: string,
-  ) => {
-    // This would use your auth hook in a real implementation
-    setShowAuthModal(false);
+  // Handle favorite toggle
+  const handleFavorite = (anime: AnimeGridItem) => {
+    if (!user) {
+      setShowAuthModal(true);
+      return;
+    }
+
     Alert.alert(
-      "Register",
-      "Registration functionality would be implemented here",
+      "Favorites",
+      `${anime.is_favorite ? "Remove from" : "Add to"} favorites?`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Confirm",
+          onPress: async () => {
+            // Toggle favorite status
+            console.log(`Toggled favorite status for ${anime.id}`);
+          },
+        },
+      ],
     );
   };
 
-  // Handle social login
-  const handleSocialLogin = (provider: string) => {
-    // This would use your auth hook in a real implementation
-    setShowAuthModal(false);
-    Alert.alert("Social Login", `${provider} login would be implemented here`);
+  // Handle add to list
+  const handleAddToList = (anime: AnimeGridItem) => {
+    if (!user) {
+      setShowAuthModal(true);
+      return;
+    }
+
+    Alert.alert("Add to List", `Add "${anime.title}" to your list`, [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Watchlist",
+        onPress: () => addToList(anime.id, "watchlist"),
+      },
+      {
+        text: "Currently Watching",
+        onPress: () => addToList(anime.id, "watching"),
+      },
+      {
+        text: "Completed",
+        onPress: () => addToList(anime.id, "completed"),
+      },
+    ]);
   };
 
   return (
-    <SafeAreaView className="flex-1 bg-gray-900">
-      <StatusBar barStyle="light-content" backgroundColor="#111827" />
-      <View className="flex-1">
-        {/* Header */}
-        <View className="w-full h-[60px] bg-gray-900 flex-row items-center justify-between px-4 border-b border-gray-800">
-          <TouchableOpacity onPress={handleBackPress}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: "#171717" }}>
+      <StatusBar barStyle="light-content" backgroundColor="#171717" />
+      <View style={{ flex: 1 }}>
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            padding: 16,
+            backgroundColor: "#171717",
+          }}
+        >
+          <TouchableOpacity
+            onPress={handleBackPress}
+            style={{
+              width: 40,
+              height: 40,
+              borderRadius: 20,
+              alignItems: "center",
+              justifyContent: "center",
+              backgroundColor: "#2A2A2A",
+            }}
+          >
             <ArrowLeft size={24} color="#FFFFFF" />
           </TouchableOpacity>
-          <Text className="text-white font-bold text-lg">New Releases</Text>
-          <View style={{ width: 24 }} /> {/* Empty view for balance */}
+          <Text
+            style={{
+              flex: 1,
+              fontSize: 20,
+              fontWeight: "bold",
+              color: "#FFFFFF",
+              marginLeft: 16,
+              textAlign: "center",
+            }}
+          >
+            New Releases
+          </Text>
+          <View style={{ width: 40 }} /> {/* Empty view for balance */}
         </View>
 
         <FilterBar
-          onFilterChange={handleFilterChange}
-          onSortChange={handleSortChange}
+          filters={["All", "TV", "Movie", "OVA", "Special"]}
+          selectedFilters={selectedFilters}
+          onFilterPress={(filter) => {
+            // Toggle the filter in the selectedFilters array
+            if (selectedFilters.includes(filter)) {
+              setSelectedFilters(selectedFilters.filter(f => f !== filter));
+            } else {
+              setSelectedFilters([...selectedFilters, filter]);
+            }
+          }}
+          isLoading={loading.newReleases}
         />
 
-        <View className="flex-1 pb-[70px]">
+        <View style={{ flex: 1, paddingBottom: 70 }}>
           <AnimeGrid
             data={filteredAnime}
-            isLoading={loading.newReleases}
+            loading={loading.newReleases}
+            refreshing={loading.newReleases}
+            onRefresh={fetchNewReleases}
             onAnimePress={handleAnimePress}
             onAddToList={handleAddToList}
             onFavorite={handleFavorite}
+            numColumns={2}
           />
         </View>
 
-        <BottomNavigation activeTab={activeTab} onTabChange={setActiveTab} />
-
-        <AuthModal
-          visible={showAuthModal}
-          onClose={() => setShowAuthModal(false)}
-          onLogin={handleLogin}
-          onRegister={handleRegister}
-          onSocialLogin={handleSocialLogin}
+        <BottomNavigation
+          currentRoute="/new-releases"
+          activeTab={activeTab}
+          onTabChange={setActiveTab}
         />
+
+        {showAuthModal && (
+          <AuthModal
+            visible={showAuthModal}
+            onClose={() => setShowAuthModal(false)}
+          />
+        )}
       </View>
     </SafeAreaView>
   );

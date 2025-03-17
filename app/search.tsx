@@ -11,16 +11,25 @@ import {
 import { useRouter } from "expo-router";
 import { Search as SearchIcon, ArrowLeft, X } from "lucide-react-native";
 import AnimeGrid from "./components/AnimeGrid";
-import BottomNavigation from "./components/BottomNavigation";
-import AuthModal from "./components/AuthModal";
+import AuthModal from "./auth/components/AuthModal";
+import { useAuth } from "./context/AuthContext";
+import type { Database } from "@/lib/database.types";
 
-interface Anime {
+// Define the Anime type to match the one used in AnimeGrid
+type DatabaseAnime = {
   id: string;
   title: string;
-  imageUrl: string;
-  rating: number;
-  isFavorite: boolean;
-  genres?: string[];
+  image_url: string;
+  rating: number | null;
+  description: string | null;
+  release_date: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+// Local anime type for the search screen
+interface LocalAnime extends DatabaseAnime {
+  is_favorite?: boolean;
 }
 
 export default function SearchScreen() {
@@ -28,83 +37,107 @@ export default function SearchScreen() {
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState("search");
   const [isLoading, setIsLoading] = useState(false);
-  const [searchResults, setSearchResults] = useState<Anime[]>([]);
+  const [searchResults, setSearchResults] = useState<LocalAnime[]>([]);
   const [showAuthModal, setShowAuthModal] = useState(false);
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const { user, isLoading: authLoading } = useAuth();
 
   // Sample anime data
-  const allAnime: Anime[] = [
+  const allAnime: LocalAnime[] = [
     {
       id: "1",
       title: "Attack on Titan",
-      imageUrl:
+      image_url:
         "https://images.unsplash.com/photo-1541562232579-512a21360020?w=400&q=80",
       rating: 4.8,
-      isFavorite: true,
-      genres: ["Action", "Drama", "Fantasy"],
+      is_favorite: true,
+      description: null,
+      release_date: null,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
     },
     {
       id: "2",
       title: "My Hero Academia",
-      imageUrl:
+      image_url:
         "https://images.unsplash.com/photo-1560972550-aba3456b5564?w=400&q=80",
       rating: 4.6,
-      isFavorite: false,
-      genres: ["Action", "Comedy", "Sci-Fi"],
+      is_favorite: false,
+      description: null,
+      release_date: null,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
     },
     {
       id: "3",
       title: "Demon Slayer",
-      imageUrl:
+      image_url:
         "https://images.unsplash.com/photo-1578632767115-351597cf2477?w=400&q=80",
       rating: 4.9,
-      isFavorite: true,
-      genres: ["Action", "Fantasy", "Horror"],
+      is_favorite: true,
+      description: null,
+      release_date: null,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
     },
     {
       id: "4",
       title: "One Piece",
-      imageUrl:
+      image_url:
         "https://images.unsplash.com/photo-1607604276583-eef5d076aa5f?w=400&q=80",
       rating: 4.7,
-      isFavorite: false,
-      genres: ["Action", "Adventure", "Comedy"],
+      is_favorite: false,
+      description: null,
+      release_date: null,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
     },
     {
       id: "5",
       title: "Jujutsu Kaisen",
-      imageUrl:
+      image_url:
         "https://images.unsplash.com/photo-1618336753974-aae8e04506aa?w=400&q=80",
       rating: 4.8,
-      isFavorite: false,
-      genres: ["Action", "Fantasy", "Horror"],
+      is_favorite: false,
+      description: null,
+      release_date: null,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
     },
     {
       id: "6",
       title: "Naruto Shippuden",
-      imageUrl:
+      image_url:
         "https://images.unsplash.com/photo-1601850494422-3cf14624b0b3?w=400&q=80",
       rating: 4.5,
-      isFavorite: true,
-      genres: ["Action", "Adventure", "Fantasy"],
+      is_favorite: true,
+      description: null,
+      release_date: null,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
     },
     {
       id: "7",
       title: "Tokyo Ghoul",
-      imageUrl:
+      image_url:
         "https://images.unsplash.com/photo-1612036782180-6f0b6cd846fe?w=400&q=80",
       rating: 4.3,
-      isFavorite: false,
-      genres: ["Action", "Drama", "Horror"],
+      is_favorite: false,
+      description: null,
+      release_date: null,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
     },
     {
       id: "8",
       title: "Fullmetal Alchemist: Brotherhood",
-      imageUrl:
+      image_url:
         "https://images.unsplash.com/photo-1614583225154-5fcdda07019e?w=400&q=80",
       rating: 4.9,
-      isFavorite: true,
-      genres: ["Action", "Adventure", "Drama"],
+      is_favorite: true,
+      description: null,
+      release_date: null,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
     },
   ];
 
@@ -150,83 +183,47 @@ export default function SearchScreen() {
   };
 
   // Handle anime press
-  const handleAnimePress = (id: string) => {
-    console.log(`Anime pressed: ${id}`);
+  const handleAnimePress = (anime: LocalAnime) => {
+    console.log(`Anime pressed: ${anime.id}`);
     // Navigate to anime details
-    Alert.alert("Anime Details", `Viewing details for anime ID: ${id}`);
+    Alert.alert("Anime Details", `Viewing details for anime ID: ${anime.id}`);
   };
 
   // Handle add to list
-  const handleAddToList = (id: string) => {
-    if (!isAuthenticated) {
+  const handleAddToList = (anime: LocalAnime) => {
+    if (!user) {
       setShowAuthModal(true);
       return;
     }
-    console.log(`Add to list: ${id}`);
+    console.log(`Add to list: ${anime.id}`);
     // Show list selection modal
-    const anime = allAnime.find((item) => item.id === id);
-    if (anime) {
-      Alert.alert("Add to List", `Add "${anime.title}" to your list`, [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Watchlist",
-          onPress: () => console.log(`Added ${id} to watchlist`),
-        },
-        {
-          text: "Favorites",
-          onPress: () => console.log(`Added ${id} to favorites`),
-        },
-        {
-          text: "Currently Watching",
-          onPress: () => console.log(`Added ${id} to currently watching`),
-        },
-      ]);
-    }
+    Alert.alert("Add to List", `Add "${anime.title}" to your list`, [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Watchlist",
+        onPress: () => console.log(`Added ${anime.id} to watchlist`),
+      },
+      {
+        text: "Favorites",
+        onPress: () => console.log(`Added ${anime.id} to favorites`),
+      },
+      {
+        text: "Currently Watching",
+        onPress: () => console.log(`Added ${anime.id} to currently watching`),
+      },
+    ]);
   };
 
   // Handle favorite toggle
-  const handleFavorite = (id: string) => {
-    if (!isAuthenticated) {
+  const handleFavorite = (anime: LocalAnime) => {
+    if (!user) {
       setShowAuthModal(true);
       return;
     }
     // This would update the favorite status in a real app
-    console.log(`Toggle favorite: ${id}`);
-    const anime = allAnime.find((item) => item.id === id);
-    if (anime) {
-      Alert.alert("Favorites", `"${anime.title}" added to favorites`);
-    }
+    console.log(`Toggle favorite: ${anime.id}`);
+    Alert.alert("Favorites", `"${anime.title}" added to favorites`);
   };
-
-  // Handle login
-  const handleLogin = useCallback((email: string, password: string) => {
-    // Simulate login
-    console.log(`Login with ${email} and ${password}`);
-    setIsAuthenticated(true);
-    setShowAuthModal(false);
-    Alert.alert("Success", "You have successfully logged in!");
-  }, []);
-
-  // Handle register
-  const handleRegister = useCallback(
-    (email: string, password: string, username: string) => {
-      // Simulate registration
-      console.log(`Register with ${email}, ${password}, and ${username}`);
-      setIsAuthenticated(true);
-      setShowAuthModal(false);
-      Alert.alert("Success", "Your account has been created successfully!");
-    },
-    [],
-  );
-
-  // Handle social login
-  const handleSocialLogin = useCallback((provider: string) => {
-    // Simulate social login
-    console.log(`Login with ${provider}`);
-    setIsAuthenticated(true);
-    setShowAuthModal(false);
-    Alert.alert("Success", `You have successfully logged in with ${provider}!`);
-  }, []);
 
   return (
     <SafeAreaView className="flex-1 bg-gray-900">
@@ -260,9 +257,9 @@ export default function SearchScreen() {
         </View>
 
         {/* Search Results */}
-        <View className="flex-1 pb-[70px]">
+        <View className="flex-1">
           {searchQuery.trim() === "" ? (
-            <View className="flex-1 items-center justify-center">
+            <View className="flex-1 items-center justify-center pb-[80px]">
               <Text className="text-gray-400 text-lg">Search for anime</Text>
               <Text className="text-gray-500 text-sm mt-2">
                 Enter a title to find anime
@@ -271,7 +268,7 @@ export default function SearchScreen() {
           ) : (
             <AnimeGrid
               data={searchResults}
-              isLoading={isLoading}
+              loading={isLoading}
               onAnimePress={handleAnimePress}
               onAddToList={handleAddToList}
               onFavorite={handleFavorite}
@@ -279,14 +276,9 @@ export default function SearchScreen() {
           )}
         </View>
 
-        <BottomNavigation activeTab={activeTab} onTabChange={setActiveTab} />
-
         <AuthModal
           visible={showAuthModal}
           onClose={() => setShowAuthModal(false)}
-          onLogin={handleLogin}
-          onRegister={handleRegister}
-          onSocialLogin={handleSocialLogin}
         />
       </View>
     </SafeAreaView>

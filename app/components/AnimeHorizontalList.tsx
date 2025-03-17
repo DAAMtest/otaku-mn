@@ -1,92 +1,149 @@
 import React from "react";
-import {
-  View,
-  Text,
-  FlatList,
-  TouchableOpacity,
-  ActivityIndicator,
-} from "react-native";
+import { FlatList, ListRenderItem, View, Text, TouchableOpacity, ActivityIndicator, StyleSheet } from "react-native";
 import { ChevronRight } from "lucide-react-native";
-import AnimeCard from "./AnimeCard";
-import { Anime } from "../hooks/useAnimeSearch";
+import AnimeCard from "@/components/AnimeCard";
+import { useTheme } from "@/context/ThemeProvider";
+import type { Database } from "@/lib/database.types";
+
+type Tables = Database["public"]["Tables"];
+type Anime = Tables["anime"]["Row"] & {
+  is_favorite?: boolean;
+};
 
 interface AnimeHorizontalListProps {
   title: string;
   data: Anime[];
-  isLoading?: boolean;
+  loading?: boolean;
   onSeeAllPress?: () => void;
-  onAnimePress?: (id: string) => void;
-  onAddToList?: (id: string) => void;
-  onFavorite?: (id: string) => void;
+  onAnimePress?: (anime: Anime) => void;
+  onFavorite?: (anime: Anime) => void;
 }
 
-const AnimeHorizontalList = ({
+/**
+ * AnimeHorizontalList component displays a horizontal scrollable list of anime
+ * with a title and optional "See All" button.
+ */
+const AnimeHorizontalList = React.memo(function AnimeHorizontalList({
   title,
   data = [],
-  isLoading = false,
-  onSeeAllPress = () => {},
-  onAnimePress = () => {},
-  onAddToList = () => {},
-  onFavorite = () => {},
-}: AnimeHorizontalListProps) => {
-  const renderItem = ({ item }: { item: Anime }) => (
+  loading = false,
+  onSeeAllPress,
+  onAnimePress,
+  onFavorite,
+}: AnimeHorizontalListProps) {
+  const { colors } = useTheme();
+
+  const renderItem: ListRenderItem<Anime> = ({ item }) => (
     <AnimeCard
       id={item.id}
       title={item.title}
-      imageUrl={item.imageUrl}
-      rating={item.rating}
-      isFavorite={item.isFavorite}
-      onPress={() => onAnimePress(item.id)}
-      onAddToList={() => onAddToList(item.id)}
-      onFavorite={() => onFavorite(item.id)}
+      imageUrl={item.image_url}
+      rating={item.rating ?? undefined}
+      isFavorite={item.is_favorite}
+      onPress={() => onAnimePress?.(item)}
+      onFavoritePress={() => onFavorite?.(item)}
+      size="medium"
     />
   );
 
   const renderEmpty = () => {
-    if (isLoading) {
+    if (loading) {
       return (
-        <View className="flex-1 items-center justify-center py-10 px-4">
-          <ActivityIndicator size="large" color="#6366F1" />
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={colors.primary} />
         </View>
       );
     }
 
     return (
-      <View className="flex-1 items-center justify-center py-10 px-4">
-        <Text className="text-gray-400 text-base">No anime found</Text>
+      <View style={styles.emptyContainer}>
+        <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
+          No anime available
+        </Text>
       </View>
     );
   };
 
   return (
-    <View className="mb-6">
-      <View className="flex-row justify-between items-center px-4 mb-2">
-        <Text className="text-white font-bold text-lg">{title}</Text>
-        <TouchableOpacity
-          onPress={onSeeAllPress}
-          className="flex-row items-center"
-        >
-          <Text className="text-blue-400 mr-1">See All</Text>
-          <ChevronRight size={16} color="#60A5FA" />
-        </TouchableOpacity>
+    <View style={styles.container}>
+      <View style={styles.headerContainer}>
+        <Text style={[styles.title, { color: colors.text }]}>{title}</Text>
+        
+        {onSeeAllPress && (
+          <TouchableOpacity
+            style={styles.seeAllButton}
+            onPress={onSeeAllPress}
+            activeOpacity={0.7}
+          >
+            <Text style={[styles.seeAllText, { color: colors.primary }]}>See All</Text>
+            <ChevronRight size={16} color={colors.primary} />
+          </TouchableOpacity>
+        )}
       </View>
-
+      
       <FlatList
         data={data}
         renderItem={renderItem}
-        keyExtractor={(item) => item.id}
+        keyExtractor={(item) => item.id.toString()}
         horizontal
         showsHorizontalScrollIndicator={false}
-        contentContainerStyle={{
-          paddingHorizontal: 12,
-          paddingVertical: 8,
-          minHeight: 250,
-        }}
+        contentContainerStyle={styles.listContent}
+        ItemSeparatorComponent={() => <View style={styles.separator} />}
         ListEmptyComponent={renderEmpty}
-        ItemSeparatorComponent={() => <View style={{ width: 12 }} />}
+        onEndReachedThreshold={0.5}
       />
     </View>
   );
-};
+});
+
+const styles = StyleSheet.create({
+  container: {
+    marginBottom: 24,
+  },
+  headerContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    marginBottom: 8,
+  },
+  title: {
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  seeAllButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  seeAllText: {
+    fontSize: 14,
+    marginRight: 4,
+  },
+  listContent: {
+    paddingLeft: 16,
+    paddingRight: 16,
+  },
+  separator: {
+    width: 12,
+  },
+  loadingContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 40,
+    paddingHorizontal: 16,
+    width: 240,
+  },
+  emptyContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 40,
+    paddingHorizontal: 16,
+    width: 240,
+  },
+  emptyText: {
+    textAlign: 'center',
+    fontSize: 14,
+  },
+});
 
 export default AnimeHorizontalList;

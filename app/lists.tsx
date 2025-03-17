@@ -172,7 +172,7 @@ export default function ListsScreen() {
   const handleListItemOptions = (id: string, listType: string) => {
     const anime = lists[listType as keyof typeof lists].find(
       (item) => item.id === id,
-    );
+    ) as AnimeListItem;
 
     if (!anime) return;
 
@@ -190,7 +190,7 @@ export default function ListsScreen() {
           onPress: () =>
             Alert.alert(
               "Update Progress",
-              `Current progress: ${anime.progress}%`,
+              `Current progress: ${anime.progress ?? 0}%`,
             ),
         },
       );

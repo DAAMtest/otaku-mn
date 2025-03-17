@@ -203,7 +203,7 @@ export default function AdminSettings() {
                     setSettings({ ...settings, maintenance_mode: value })
                   }
                   trackColor={{ false: "#3f3f46", true: "#ef4444" }}
-                  thumbColor={settings.maintenance_mode ? "#f87171" : "#9ca3af"}
+                  thumbColor={settings.maintenance_mode ? "#ffffff" : "#d4d4d8"}
                 />
               </View>
 
@@ -218,7 +218,7 @@ export default function AdminSettings() {
                     setSettings({ ...settings, allow_new_registrations: value })
                   }
                   trackColor={{ false: "#3f3f46", true: "#2563eb" }}
-                  thumbColor={settings.allow_new_registrations ? "#60a5fa" : "#9ca3af"}
+                  thumbColor={settings.allow_new_registrations ? "#ffffff" : "#d4d4d8"}
                 />
               </View>
 
@@ -351,4 +351,52 @@ export default function AdminSettings() {
                     setSettings({ ...settings, content_moderation: value })
                   }
                   trackColor={{ false: "#3f3f46", true: "#7c3aed" }}
-                  thumb
+                  thumbColor={settings.content_moderation ? "#ffffff" : "#d4d4d8"}
+                />
+              </View>
+            </View>
+          </View>
+
+          {/* Action Buttons */}
+          <View className="space-y-4">
+            <TouchableOpacity
+              onPress={handleResetSettings}
+              className="bg-red-500 p-4 rounded-lg flex-row items-center justify-center"
+            >
+              <RefreshCw size={20} color="#FFFFFF" className="mr-2" />
+              <Text className="text-white font-semibold">Reset to Defaults</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={handleExportSettings}
+              className="bg-blue-500 p-4 rounded-lg flex-row items-center justify-center"
+            >
+              <FileJson size={20} color="#FFFFFF" className="mr-2" />
+              <Text className="text-white font-semibold">Export Settings</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={handleImportSettings}
+              className="bg-blue-500 p-4 rounded-lg flex-row items-center justify-center"
+            >
+              <FileJson size={20} color="#FFFFFF" className="mr-2" />
+              <Text className="text-white font-semibold">Import Settings</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={handleDatabaseBackup}
+              className="bg-green-500 p-4 rounded-lg flex-row items-center justify-center"
+            >
+              <Database size={20} color="#FFFFFF" className="mr-2" />
+              <Text className="text-white font-semibold">Database Backup</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={handleClearCache}
+              className="bg-yellow-500 p-4 rounded-lg flex-row items-center justify-center"
+            >
+              <Trash2 size={20} color="#FFFFFF" className="mr-2" />
+              <Text className="text-white font-semibold">Clear Cache</Text>
+            </TouchableOpacity>
+          </View>
+        </ScrollView>
+      </View>
+    </SafeAreaView>
+  );
+}

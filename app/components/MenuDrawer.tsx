@@ -1,47 +1,43 @@
-import React from "react";
+import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
-  Text,
-  TouchableOpacity,
   Image,
-  ScrollView,
+  TouchableOpacity,
+  StyleSheet,
   Animated,
   Dimensions,
   Platform,
-  StatusBar,
-  Easing,
-} from "react-native";
-import {
-  X,
-  Home,
-  Search,
-  BookmarkIcon,
-  Settings,
-  Info,
-  LogOut,
-  Bell,
-  User,
-  Film,
-  TrendingUp,
-  Calendar,
-  Heart,
-  ChevronRight,
-} from "lucide-react-native";
+  Pressable,
+} from 'react-native';
+import { useRouter } from 'expo-router';
+import { X, Settings, Moon, Sun, LogOut, Info, Heart, BookmarkIcon } from 'lucide-react-native';
+import { useTheme } from '@/context/ThemeProvider';
+import Typography from './Typography';
+import { useToast } from '@/context/ToastContext';
 
 interface MenuDrawerProps {
   visible: boolean;
   onClose: () => void;
-  onMenuItemPress: (item: string) => void;
-  isAuthenticated: boolean;
+  onMenuItemPress?: (route: string) => void;
+  isAuthenticated?: boolean;
   username?: string;
   avatarUrl?: string;
 }
 
-const { width, height } = Dimensions.get("window");
-const DRAWER_WIDTH = width * 0.85;
-const STATUS_BAR_HEIGHT =
-  Platform.OS === "ios" ? 44 : StatusBar.currentHeight || 0;
+interface MenuItem {
+  icon: React.ReactNode;
+  label: string;
+  route: string;
+  requiresAuth?: boolean;
+}
 
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+const DRAWER_WIDTH = Math.min(SCREEN_WIDTH * 0.85, 320);
+
+/**
+ * MenuDrawer component provides a slide-in menu with navigation options
+ * and user profile information with animations and accessibility features
+ */
 const MenuDrawer = ({
   visible,
   onClose,
@@ -50,244 +46,381 @@ const MenuDrawer = ({
   username = "Guest",
   avatarUrl = "https://api.dicebear.com/7.x/avataaars/svg?seed=guest",
 }: MenuDrawerProps) => {
-  const translateX = React.useRef(new Animated.Value(-DRAWER_WIDTH)).current;
-  const opacity = React.useRef(new Animated.Value(0)).current;
-
-  React.useEffect(() => {
+  const router = useRouter();
+  const { colors, isDarkMode, toggleTheme } = useTheme();
+  const { showToast } = useToast();
+  
+  // Animation values
+  const translateX = useRef(new Animated.Value(DRAWER_WIDTH)).current;
+  const backdropOpacity = useRef(new Animated.Value(0)).current;
+  
+  // Track if drawer is fully hidden
+  const [isFullyHidden, setIsFullyHidden] = useState(!visible);
+  
+  // Menu items configuration
+  const menuItems: MenuItem[] = [
+    {
+      icon: <BookmarkIcon size={24} color={colors.text} />,
+      label: 'My Library',
+      route: '/library',
+      requiresAuth: true,
+    },
+    {
+      icon: <Heart size={24} color={colors.text} />,
+      label: 'Favorites',
+      route: '/favorites',
+      requiresAuth: true,
+    },
+    {
+      icon: <Settings size={24} color={colors.text} />,
+      label: 'Settings',
+      route: '/settings',
+    },
+    {
+      icon: <Info size={24} color={colors.text} />,
+      label: 'About',
+      route: '/about',
+    },
+  ];
+  
+  // Handle drawer animation
+  useEffect(() => {
     if (visible) {
-      // Provide haptic feedback when opening drawer
+      setIsFullyHidden(false);
+      Animated.parallel([
+        Animated.timing(translateX, {
+          toValue: 0,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+        Animated.timing(backdropOpacity, {
+          toValue: 1,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+      ]).start();
+      
+      // Add haptic feedback on open
       try {
         const Haptics = require("expo-haptics");
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
       } catch (error) {
         // Haptics not available, continue silently
       }
-
-      Animated.parallel([
-        Animated.timing(translateX, {
-          toValue: 0,
-          duration: 300,
-          useNativeDriver: true,
-          easing: Easing.out(Easing.cubic), // Add easing for smoother animation
-        }),
-        Animated.timing(opacity, {
-          toValue: 1,
-          duration: 300,
-          useNativeDriver: true,
-        }),
-      ]).start();
     } else {
       Animated.parallel([
         Animated.timing(translateX, {
-          toValue: -DRAWER_WIDTH,
-          duration: 250, // Slightly faster closing animation
+          toValue: DRAWER_WIDTH,
+          duration: 200,
           useNativeDriver: true,
-          easing: Easing.in(Easing.cubic), // Add easing for smoother animation
         }),
-        Animated.timing(opacity, {
+        Animated.timing(backdropOpacity, {
           toValue: 0,
-          duration: 250,
+          duration: 200,
           useNativeDriver: true,
         }),
-      ]).start();
+      ]).start(() => {
+        // Set fully hidden after animation completes
+        setIsFullyHidden(true);
+      });
     }
-  }, [visible, translateX, opacity]);
-
-  if (!visible) return null;
-
-  const mainMenuItems = [
-    { key: "home", label: "Home", icon: Home },
-    { key: "search", label: "Search", icon: Search },
-    { key: "lists", label: "My Lists", icon: BookmarkIcon },
-    { key: "profile", label: "Profile", icon: User },
-  ];
-
-  const discoverMenuItems = [
-    { key: "trending", label: "Trending Now", icon: TrendingUp },
-    { key: "new_releases", label: "New Releases", icon: Calendar },
-    { key: "top_rated", label: "Top Rated", icon: Film },
-    { key: "popular", label: "Most Popular", icon: Heart },
-  ];
-
-  const settingsMenuItems = [
-    { key: "notifications", label: "Notifications", icon: Bell },
-    { key: "settings", label: "Settings", icon: Settings },
-    { key: "about", label: "About", icon: Info },
-  ];
+  }, [visible, translateX, backdropOpacity]);
+  
+  // Handle menu item press
+  const handleMenuItemPress = (route: string, requiresAuth: boolean = false) => {
+    // Add haptic feedback
+    try {
+      const Haptics = require("expo-haptics");
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    } catch (error) {
+      // Haptics not available, continue silently
+    }
+    
+    if (requiresAuth && !isAuthenticated) {
+      showToast('Please sign in to access this feature', 'warning');
+      onClose();
+      return;
+    }
+    
+    if (onMenuItemPress) {
+      onMenuItemPress(route);
+    } else {
+      router.push(route);
+    }
+    
+    onClose();
+  };
+  
+  // Handle theme toggle
+  const handleThemeToggle = () => {
+    // Add haptic feedback
+    try {
+      const Haptics = require("expo-haptics");
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    } catch (error) {
+      // Haptics not available, continue silently
+    }
+    
+    toggleTheme();
+    showToast(`Switched to ${isDarkMode ? 'light' : 'dark'} mode`, 'info');
+  };
+  
+  // Handle logout
+  const handleLogout = () => {
+    // Add haptic feedback
+    try {
+      const Haptics = require("expo-haptics");
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } catch (error) {
+      // Haptics not available, continue silently
+    }
+    
+    showToast('Logged out successfully', 'success');
+    onClose();
+    // Implement actual logout logic here
+  };
+  
+  // Don't render if fully hidden
+  if (isFullyHidden) {
+    return null;
+  }
 
   return (
-    <Animated.View
-      style={{
-        position: "absolute",
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        zIndex: 1000,
-        opacity: opacity,
-      }}
-    >
-      <TouchableOpacity
-        activeOpacity={1}
-        onPress={onClose}
-        className="absolute top-0 left-0 right-0 bottom-0 bg-black/60"
-      />
-
-      <Animated.View
-        style={{
-          transform: [{ translateX }],
-          width: DRAWER_WIDTH,
-          height: "100%",
-          paddingTop: STATUS_BAR_HEIGHT,
-        }}
-        className="bg-gray-900 absolute top-0 left-0 bottom-0 shadow-xl"
+    <View style={styles.container}>
+      {/* Backdrop */}
+      <Animated.View 
+        style={[
+          styles.backdrop,
+          { 
+            opacity: backdropOpacity,
+            backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          },
+        ]}
       >
-        {/* Header with user info */}
-        <View className="p-6 border-b border-gray-800 bg-gray-800/50">
-          <View className="flex-row justify-between items-center mb-4">
-            <View className="flex-row items-center">
-              <Image
-                source={require("../../assets/images/icon.png")}
-                className="w-8 h-8 rounded-md mr-2"
-                resizeMode="contain"
-              />
-              <Text className="text-white text-xl font-bold">
-                Otaku Mongolia
-              </Text>
-            </View>
-            <TouchableOpacity
-              onPress={onClose}
-              className="p-2 bg-gray-700/50 rounded-full"
-              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+        <Pressable 
+          style={styles.backdropPressable}
+          onPress={onClose}
+          accessibilityRole="button"
+          accessibilityLabel="Close menu"
+          accessibilityHint="Closes the navigation menu"
+        />
+      </Animated.View>
+      
+      {/* Drawer Content */}
+      <Animated.View 
+        style={[
+          styles.drawer,
+          {
+            backgroundColor: colors.card,
+            borderRightColor: colors.border,
+            transform: [{ translateX: translateX }],
+          },
+        ]}
+        accessibilityViewIsModal={true}
+        accessibilityRole="menu"
+      >
+        {/* Header with close button */}
+        <View style={styles.header}>
+          <TouchableOpacity
+            onPress={onClose}
+            style={styles.closeButton}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            accessibilityRole="button"
+            accessibilityLabel="Close menu"
+          >
+            <X size={24} color={colors.text} />
+          </TouchableOpacity>
+        </View>
+        
+        {/* User Profile Section */}
+        <View style={styles.profileSection}>
+          <Image 
+            source={{ uri: avatarUrl }} 
+            style={styles.avatar}
+            accessibilityIgnoresInvertColors={true}
+          />
+          <View style={styles.profileInfo}>
+            <Typography variant="h3" style={styles.username}>
+              {username}
+            </Typography>
+            <Typography 
+              variant="bodySmall" 
+              color={colors.textSecondary}
             >
-              <X size={18} color="#FFFFFF" />
-            </TouchableOpacity>
-          </View>
-
-          <View className="flex-row items-center mt-4">
-            <Image
-              source={{ uri: avatarUrl }}
-              className="w-16 h-16 rounded-full border-2 border-purple-500"
-              resizeMode="cover"
-            />
-            <View className="ml-3 flex-1">
-              <Text className="text-white text-lg font-semibold">
-                {isAuthenticated ? username : "Guest"}
-              </Text>
-              {!isAuthenticated ? (
-                <TouchableOpacity
-                  onPress={() => onMenuItemPress("login")}
-                  className="mt-1 bg-purple-600 py-1 px-3 rounded-full self-start"
-                >
-                  <Text className="text-white text-sm font-medium">
-                    Sign in
-                  </Text>
-                </TouchableOpacity>
-              ) : (
-                <TouchableOpacity
-                  onPress={() => onMenuItemPress("profile")}
-                  className="mt-1 flex-row items-center"
-                >
-                  <Text className="text-purple-400 text-sm mr-1">
-                    View Profile
-                  </Text>
-                  <ChevronRight size={14} color="#C084FC" />
-                </TouchableOpacity>
-              )}
-            </View>
+              {isAuthenticated ? 'Signed In' : 'Guest User'}
+            </Typography>
           </View>
         </View>
-
-        <ScrollView className="flex-1" showsVerticalScrollIndicator={false}>
-          {/* Main Navigation */}
-          <View className="px-4 py-3">
-            <Text className="text-gray-400 text-xs font-medium uppercase tracking-wider px-2 mb-1">
-              Main Navigation
-            </Text>
-            {mainMenuItems.map((item) => {
-              const IconComponent = item.icon;
-              return (
-                <TouchableOpacity
-                  key={item.key}
-                  className="flex-row items-center p-3 rounded-lg mb-1 hover:bg-gray-800 active:bg-gray-800"
-                  onPress={() => onMenuItemPress(item.key)}
-                >
-                  <View className="w-8 h-8 bg-gray-800 rounded-lg items-center justify-center mr-3">
-                    <IconComponent size={18} color="#C084FC" />
-                  </View>
-                  <Text className="text-white text-base font-medium">
-                    {item.label}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-
-          {/* Discover Section */}
-          <View className="px-4 py-3 mt-2">
-            <Text className="text-gray-400 text-xs font-medium uppercase tracking-wider px-2 mb-1">
-              Discover
-            </Text>
-            {discoverMenuItems.map((item) => {
-              const IconComponent = item.icon;
-              return (
-                <TouchableOpacity
-                  key={item.key}
-                  className="flex-row items-center p-3 rounded-lg mb-1 hover:bg-gray-800 active:bg-gray-800"
-                  onPress={() => onMenuItemPress(item.key)}
-                >
-                  <View className="w-8 h-8 bg-gray-800 rounded-lg items-center justify-center mr-3">
-                    <IconComponent size={18} color="#60A5FA" />
-                  </View>
-                  <Text className="text-white text-base font-medium">
-                    {item.label}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-
-          {/* Settings Section */}
-          <View className="px-4 py-3 mt-2">
-            <Text className="text-gray-400 text-xs font-medium uppercase tracking-wider px-2 mb-1">
-              Settings
-            </Text>
-            {settingsMenuItems.map((item) => {
-              const IconComponent = item.icon;
-              return (
-                <TouchableOpacity
-                  key={item.key}
-                  className="flex-row items-center p-3 rounded-lg mb-1 hover:bg-gray-800 active:bg-gray-800"
-                  onPress={() => onMenuItemPress(item.key)}
-                >
-                  <View className="w-8 h-8 bg-gray-800 rounded-lg items-center justify-center mr-3">
-                    <IconComponent size={18} color="#9CA3AF" />
-                  </View>
-                  <Text className="text-white text-base font-medium">
-                    {item.label}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-        </ScrollView>
-
-        {isAuthenticated && (
-          <View className="p-4 border-t border-gray-800 bg-gray-800/30">
+        
+        <View style={styles.divider} />
+        
+        {/* Menu Items */}
+        <View style={styles.menuItems}>
+          {menuItems.map((item, index) => (
             <TouchableOpacity
-              className="flex-row items-center p-3 rounded-lg bg-red-900/20"
-              onPress={() => onMenuItemPress("logout")}
+              key={index}
+              style={styles.menuItem}
+              onPress={() => handleMenuItemPress(item.route, item.requiresAuth)}
+              accessibilityRole="menuitem"
+              accessibilityLabel={item.label}
+              accessibilityHint={`Navigate to ${item.label}`}
             >
-              <View className="w-8 h-8 bg-red-900/30 rounded-lg items-center justify-center mr-3">
-                <LogOut size={18} color="#F87171" />
+              <View style={styles.menuItemIcon}>
+                {item.icon}
               </View>
-              <Text className="text-red-400 text-base font-medium">Logout</Text>
+              <Typography variant="body" style={styles.menuItemText}>
+                {item.label}
+              </Typography>
             </TouchableOpacity>
-          </View>
-        )}
+          ))}
+          
+          {/* Theme Toggle */}
+          <TouchableOpacity
+            style={styles.menuItem}
+            onPress={handleThemeToggle}
+            accessibilityRole="switch"
+            accessibilityLabel={`Toggle ${isDarkMode ? 'light' : 'dark'} mode`}
+            accessibilityState={{ checked: isDarkMode }}
+          >
+            <View style={styles.menuItemIcon}>
+              {isDarkMode ? (
+                <Sun size={24} color={colors.text} />
+              ) : (
+                <Moon size={24} color={colors.text} />
+              )}
+            </View>
+            <Typography variant="body" style={styles.menuItemText}>
+              {isDarkMode ? 'Light Mode' : 'Dark Mode'}
+            </Typography>
+          </TouchableOpacity>
+          
+          {/* Logout Button (only shown when authenticated) */}
+          {isAuthenticated && (
+            <>
+              <View style={styles.divider} />
+              <TouchableOpacity
+                style={[styles.menuItem, styles.logoutButton]}
+                onPress={handleLogout}
+                accessibilityRole="button"
+                accessibilityLabel="Log out"
+              >
+                <View style={styles.menuItemIcon}>
+                  <LogOut size={24} color={colors.error} />
+                </View>
+                <Typography 
+                  variant="body" 
+                  color={colors.error}
+                  style={styles.menuItemText}
+                >
+                  Logout
+                </Typography>
+              </TouchableOpacity>
+            </>
+          )}
+        </View>
+        
+        {/* Footer */}
+        <View style={styles.footer}>
+          <Typography 
+            variant="caption" 
+            color={colors.textSecondary}
+            align="center"
+          >
+            AnimeTempo v1.0.0
+          </Typography>
+        </View>
       </Animated.View>
-    </Animated.View>
+    </View>
   );
 };
+
+const styles = StyleSheet.create({
+  container: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 1000,
+  },
+  backdrop: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  backdropPressable: {
+    flex: 1,
+  },
+  drawer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    width: DRAWER_WIDTH,
+    height: SCREEN_HEIGHT,
+    borderRightWidth: 1,
+    shadowColor: '#000',
+    shadowOffset: { width: 2, height: 0 },
+    shadowOpacity: 0.2,
+    shadowRadius: 5,
+    elevation: 16,
+  },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    paddingHorizontal: 16,
+    paddingTop: Platform.OS === 'ios' ? 48 : 16,
+    paddingBottom: 8,
+  },
+  closeButton: {
+    padding: 8,
+    borderRadius: 20,
+  },
+  profileSection: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+  },
+  avatar: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: '#E0E0E0',
+  },
+  profileInfo: {
+    marginLeft: 16,
+    flex: 1,
+  },
+  username: {
+    marginBottom: 4,
+  },
+  divider: {
+    height: 1,
+    marginHorizontal: 16,
+    marginVertical: 8,
+    backgroundColor: 'rgba(150, 150, 150, 0.2)',
+  },
+  menuItems: {
+    marginTop: 8,
+  },
+  menuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+  },
+  menuItemIcon: {
+    width: 32,
+    alignItems: 'center',
+    marginRight: 16,
+  },
+  menuItemText: {
+    flex: 1,
+  },
+  logoutButton: {
+    marginTop: 8,
+  },
+  footer: {
+    position: 'absolute',
+    bottom: Platform.OS === 'ios' ? 34 : 16,
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+    paddingVertical: 16,
+  },
+});
 
 export default MenuDrawer;

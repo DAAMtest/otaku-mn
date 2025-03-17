@@ -1,39 +1,62 @@
 import React from "react";
-import { View, Text, ImageBackground, TouchableOpacity } from "react-native";
+import { ImageBackground, FlatList, ListRenderItem } from "react-native";
 import { Play, Star, Plus } from "lucide-react-native";
 import { LinearGradient } from "expo-linear-gradient";
+import { cn } from "@/lib/utils";
+import { View, Text, TouchableOpacity } from "react-native";
+import type { Database } from "@/lib/database.types";
+
+type Tables = Database["public"]["Tables"];
+type Anime = Tables["anime"]["Row"] & {
+  is_favorite?: boolean;
+  genres?: string[];
+};
 
 interface FeaturedAnimeProps {
-  id: string;
-  title: string;
-  imageUrl: string;
-  rating: number;
-  description?: string;
-  genres?: string[];
-  onPress?: () => void;
-  onPlayPress?: () => void;
-  onAddToListPress?: () => void;
+  anime: Anime;
+  onPress?: (anime: Anime) => void;
+  onPlayPress?: (anime: Anime) => void;
+  onAddToListPress?: (anime: Anime) => void;
 }
 
-const FeaturedAnime = ({
-  id = "1",
-  title = "Attack on Titan",
-  imageUrl = "https://images.unsplash.com/photo-1541562232579-512a21360020?w=800&q=80",
-  rating = 4.8,
-  description = "In a world where humanity lives inside cities surrounded by enormous walls due to the Titans, gigantic humanoid creatures who devour humans seemingly without reason.",
-  genres = ["Action", "Drama", "Fantasy"],
-  onPress = () => {},
-  onPlayPress = () => {},
-  onAddToListPress = () => {},
-}: FeaturedAnimeProps) => {
+interface GenreTagsProps {
+  genres: string[];
+}
+
+const GenreTags = React.memo<GenreTagsProps>(function GenreTags({ genres }) {
+  const renderGenre: ListRenderItem<string> = ({ item }) => (
+    <View className="bg-neutral-800 dark:bg-neutral-700 rounded-full px-2 py-0.5 mr-2">
+      <Text className="text-white text-xs">{item}</Text>
+    </View>
+  );
+
+  return (
+    <View className="flex-row">
+      <FlatList
+        data={genres.slice(0, 2)}
+        renderItem={renderGenre}
+        keyExtractor={(item: string, index: number) => `genre-${index}`}
+        horizontal
+        scrollEnabled={false}
+      />
+    </View>
+  );
+});
+
+const FeaturedAnime = React.memo(function FeaturedAnime({
+  anime,
+  onPress,
+  onPlayPress,
+  onAddToListPress,
+}: FeaturedAnimeProps) {
   return (
     <TouchableOpacity
       className="h-[200px] mx-4 mb-6 rounded-xl overflow-hidden"
-      onPress={onPress}
+      onPress={() => onPress?.(anime)}
       activeOpacity={0.9}
     >
       <ImageBackground
-        source={{ uri: imageUrl }}
+        source={{ uri: anime.image_url }}
         className="w-full h-full justify-end"
         resizeMode="cover"
       >
@@ -42,49 +65,57 @@ const FeaturedAnime = ({
           className="p-4 pt-12"
         >
           <View className="flex-row items-center mb-1">
-            <Star size={14} color="#FFD700" fill="#FFD700" />
-            <Text className="text-white text-xs ml-1 mr-3">{rating}</Text>
-            {genres.slice(0, 2).map((genre, index) => (
-              <View
-                key={genre}
-                className="bg-gray-800/80 rounded-full px-2 py-0.5 mr-2"
-              >
-                <Text className="text-white text-xs">{genre}</Text>
-              </View>
-            ))}
+            {anime.rating && (
+              <>
+                <Star size={14} className="text-amber-500" fill="#f59e0b" />
+                <Text className="text-white text-xs ml-1 mr-3">
+                  {anime.rating}
+                </Text>
+              </>
+            )}
+            {anime.genres && <GenreTags genres={anime.genres} />}
           </View>
 
-          <Text className="text-white font-bold text-xl mb-1">{title}</Text>
+          <Text className="text-white font-bold text-xl mb-1">{anime.title}</Text>
 
-          <Text
-            className="text-gray-300 text-xs mb-3"
-            numberOfLines={2}
-            ellipsizeMode="tail"
-          >
-            {description}
-          </Text>
+          {anime.description && (
+            <Text className="text-gray-300 text-xs" numberOfLines={2}>
+              {anime.description}
+            </Text>
+          )}
 
-          <View className="flex-row">
+          <View className="flex-row mt-3">
             <TouchableOpacity
-              className="bg-purple-600 rounded-full flex-row items-center px-4 py-2 mr-3"
-              onPress={onPlayPress}
+              className="bg-indigo-600 dark:bg-indigo-500 flex-row items-center rounded-full px-4 py-1.5 mr-3"
+              onPress={() => onPlayPress?.(anime)}
+              activeOpacity={0.8}
             >
-              <Play size={16} color="#FFFFFF" fill="#FFFFFF" />
-              <Text className="text-white font-medium ml-1">Watch Now</Text>
+              <Play size={16} className="text-white" />
+              <Text className="text-white text-xs font-medium ml-1">
+                Watch Now
+              </Text>
             </TouchableOpacity>
 
             <TouchableOpacity
-              className="bg-gray-800/80 rounded-full flex-row items-center px-4 py-2"
-              onPress={onAddToListPress}
+              className={cn(
+                "flex-row items-center rounded-full px-4 py-1.5",
+                anime.is_favorite 
+                  ? "bg-indigo-700 dark:bg-indigo-600" 
+                  : "bg-neutral-800 dark:bg-neutral-700"
+              )}
+              onPress={() => onAddToListPress?.(anime)}
+              activeOpacity={0.8}
             >
-              <Plus size={16} color="#FFFFFF" />
-              <Text className="text-white font-medium ml-1">My List</Text>
+              <Plus size={16} className="text-white" />
+              <Text className="text-white text-xs font-medium ml-1">
+                {anime.is_favorite ? "In My List" : "Add to List"}
+              </Text>
             </TouchableOpacity>
           </View>
         </LinearGradient>
       </ImageBackground>
     </TouchableOpacity>
   );
-};
+});
 
 export default FeaturedAnime;

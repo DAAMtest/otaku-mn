@@ -1,10 +1,16 @@
-const { getDefaultConfig } = require("expo/metro-config");
-const { withNativeWind } = require("nativewind/metro");
+// Learn more https://docs.expo.io/guides/customizing-metro
+const { getDefaultConfig } = require('@expo/metro-config');
+const { withNativeWind } = require('nativewind/metro');
+const path = require('path');
 
 // Apply graceful-fs patch to handle EMFILE errors
 require("./graceful-fs-patch");
 
-const config = getDefaultConfig(__dirname);
+/** @type {import('expo/metro-config').MetroConfig} */
+const config = getDefaultConfig(__dirname, {
+  // [Web-only]: Enables CSS support in Metro.
+  isCSSEnabled: true,
+});
 
 // Configure Metro to handle a large number of files
 config.watchFolders = [__dirname];
@@ -17,23 +23,23 @@ config.resolver.blockList = [/\.git\/.*/];
 config.watcher = {
   ...config.watcher,
   watchman: {
-    deferStates: ["hg.update"],
-    healthCheck: true,
+    deferStates: ["hg.update"]
   },
 };
 
-// Optimize the transformer
-config.transformer = {
-  ...config.transformer,
-  minifierPath: "metro-minify-terser",
-  minifierConfig: {
-    // Terser options
-    compress: { drop_console: false },
-    mangle: true,
-  },
+// Add custom resolver aliases
+config.resolver.alias = {
+  '@': path.resolve(__dirname, './app'),
+  '@components': path.resolve(__dirname, './app/components'),
+  '@context': path.resolve(__dirname, './app/context'),
+  '@lib': path.resolve(__dirname, './app/lib')
 };
 
 // Reduce the number of workers to prevent resource exhaustion
-config.maxWorkers = 2;
+config.maxWorkers = Math.max(1, (process.env.MAX_WORKERS ? parseInt(process.env.MAX_WORKERS, 10) : 4));
 
-module.exports = withNativeWind(config, { input: "./global.css" });
+// Export the config with NativeWind support
+module.exports = withNativeWind(config, {
+  input: './tailwind.css',
+  configPath: './tailwind.config.js'
+});

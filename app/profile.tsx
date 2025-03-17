@@ -21,7 +21,6 @@ import {
   Award,
   LogOut,
 } from "lucide-react-native";
-import BottomNavigation from "./components/BottomNavigation";
 
 export default function ProfileScreen() {
   const router = useRouter();
@@ -205,7 +204,6 @@ export default function ProfileScreen() {
           <View className="h-20" />
         </ScrollView>
 
-        <BottomNavigation activeTab={activeTab} onTabChange={setActiveTab} />
       </View>
     </SafeAreaView>
   );

@@ -1,17 +1,36 @@
-import React from "react";
-import { ScrollView as RNScrollView, ScrollViewProps } from "react-native";
+import React, { PropsWithChildren } from "react";
+import { ScrollViewProps } from "react-native";
+import { ScrollView as StyledScrollView } from "@/lib/nativewind-setup";
+import { cn } from "@/lib/utils";
 
-// This is a simple wrapper component to make ScrollView work with className prop
-const ScrollView: React.FC<ScrollViewProps & { className?: string }> = ({
+/**
+ * Enhanced ScrollView component that supports className prop and proper TypeScript typing
+ * 
+ * @param props - Component props including className and standard ScrollView props
+ * @returns Enhanced ScrollView component with NativeWind support
+ */
+interface EnhancedScrollViewProps extends ScrollViewProps {
+  className?: string;
+  contentContainerClassName?: string;
+}
+
+const ScrollView = React.memo(function ScrollView({
   children,
   className,
+  contentContainerClassName,
+  contentContainerStyle,
   ...props
-}) => {
+}: PropsWithChildren<EnhancedScrollViewProps>) {
   return (
-    <RNScrollView className={className} {...props}>
+    <StyledScrollView 
+      className={cn("bg-transparent", className)} 
+      contentContainerClassName={contentContainerClassName}
+      contentContainerStyle={contentContainerStyle}
+      {...props}
+    >
       {children}
-    </RNScrollView>
+    </StyledScrollView>
   );
-};
+});
 
 export default ScrollView;

@@ -1,104 +1,145 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
-import { View, SafeAreaView, StatusBar, Alert } from "react-native";
-import { useRouter } from "expo-router";
-import Header from "./components/Header";
-import FilterBar from "./components/FilterBar";
-import AnimeGrid from "./components/AnimeGrid";
-import BottomNavigation from "./components/BottomNavigation";
-import AuthModal from "./components/AuthModal";
-import MenuDrawer from "./components/MenuDrawer";
+import { View, SafeAreaView, StatusBar, Alert, Platform } from "react-native";
+import { useRouter, usePathname } from "expo-router";
+import Header from "@/components/Header";
+import FilterBar from "@/components/FilterBar";
+import AnimeGrid from "@/components/AnimeGrid";
+import AuthModal from "@/auth/components/AuthModal";
+import MenuDrawer from "@/components/MenuDrawer";
+import { useAuth } from "@/context/AuthContext";
+import type { Database } from "@/lib/database.types";
 
-interface Anime {
-  id: string;
-  title: string;
-  imageUrl: string;
-  rating: number;
-  isFavorite: boolean;
+type Tables = Database["public"]["Tables"];
+type Anime = Tables["anime"]["Row"] & {
+  is_favorite?: boolean;
   genres?: string[];
-}
+};
 
 export default function HomeScreen() {
   const router = useRouter();
+  const pathname = usePathname();
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [showMenuDrawer, setShowMenuDrawer] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [activeTab, setActiveTab] = useState("home");
   const [username, setUsername] = useState("Guest");
   const [selectedGenres, setSelectedGenres] = useState<string[]>([]);
-  const [currentSortOrder, setCurrentSortOrder] = useState<"asc" | "desc">(
-    "desc",
-  );
+  const [currentSortOrder, setCurrentSortOrder] = useState<"asc" | "desc">("desc");
+
+  // Define filter options
+  const filterOptions = useMemo(() => [
+    { id: "action", label: "Action", value: "Action" },
+    { id: "adventure", label: "Adventure", value: "Adventure" },
+    { id: "comedy", label: "Comedy", value: "Comedy" },
+    { id: "drama", label: "Drama", value: "Drama" },
+    { id: "fantasy", label: "Fantasy", value: "Fantasy" },
+    { id: "horror", label: "Horror", value: "Horror" },
+    { id: "scifi", label: "Sci-Fi", value: "Sci-Fi" }
+  ], []);
+
+  // Get current route for bottom navigation
+  const currentRoute = useMemo(() => {
+    if (pathname === "/") return "/";
+    if (pathname.startsWith("/search")) return "/search";
+    if (pathname.startsWith("/favorites")) return "/favorites";
+    if (pathname.startsWith("/profile")) return "/profile";
+    return "/";
+  }, [pathname]);
+
   const [animeList, setAnimeList] = useState<Anime[]>([
     {
       id: "1",
       title: "Attack on Titan",
-      imageUrl:
-        "https://images.unsplash.com/photo-1541562232579-512a21360020?w=400&q=80",
+      image_url: "https://images.unsplash.com/photo-1541562232579-512a21325720?w=400&q=80",
       rating: 4.8,
-      isFavorite: true,
+      is_favorite: true,
+      description: "Humanity's last stand against man-eating giants",
+      release_date: "2013-04-07",
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
       genres: ["Action", "Drama", "Fantasy"],
     },
     {
       id: "2",
       title: "My Hero Academia",
-      imageUrl:
-        "https://images.unsplash.com/photo-1560972550-aba3456b5564?w=400&q=80",
+      image_url: "https://images.unsplash.com/photo-1560972550-aba3456b5564?w=400&q=80",
       rating: 4.6,
-      isFavorite: false,
+      is_favorite: false,
+      description: "A quirkless boy's journey to become the greatest hero",
+      release_date: "2016-04-03",
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
       genres: ["Action", "Comedy", "Sci-Fi"],
     },
     {
       id: "3",
       title: "Demon Slayer",
-      imageUrl:
-        "https://images.unsplash.com/photo-1578632767115-351597cf2477?w=400&q=80",
+      image_url: "https://images.unsplash.com/photo-1578632767115-351597cf2477?w=400&q=80",
       rating: 4.9,
-      isFavorite: true,
+      is_favorite: true,
+      description: "A young demon slayer avenges his family",
+      release_date: "2019-04-06",
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
       genres: ["Action", "Fantasy", "Horror"],
     },
     {
       id: "4",
       title: "One Piece",
-      imageUrl:
-        "https://images.unsplash.com/photo-1607604276583-eef5d076aa5f?w=400&q=80",
+      image_url: "https://images.unsplash.com/photo-1607604276583-eef5d076aa5f?w=400&q=80",
       rating: 4.7,
-      isFavorite: false,
+      is_favorite: false,
+      description: "Pirates search for the ultimate treasure",
+      release_date: "1999-10-20",
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
       genres: ["Action", "Adventure", "Comedy"],
     },
     {
       id: "5",
       title: "Jujutsu Kaisen",
-      imageUrl:
-        "https://images.unsplash.com/photo-1618336753974-aae8e04506aa?w=400&q=80",
+      image_url: "https://images.unsplash.com/photo-1618336753974-aae8e04506aa?w=400&q=80",
       rating: 4.8,
-      isFavorite: false,
+      is_favorite: false,
+      description: "A high school student joins a secret organization of Jujutsu Sorcerers",
+      release_date: "2020-10-03",
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
       genres: ["Action", "Fantasy", "Horror"],
     },
     {
       id: "6",
       title: "Naruto Shippuden",
-      imageUrl:
-        "https://images.unsplash.com/photo-1601850494422-3cf14624b0b3?w=400&q=80",
+      image_url: "https://images.unsplash.com/photo-1601850494422-3cf14624b0b3?w=400&q=80",
       rating: 4.5,
-      isFavorite: true,
+      is_favorite: true,
+      description: "A ninja's quest to become the leader of his village",
+      release_date: "2007-02-15",
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
       genres: ["Action", "Adventure", "Fantasy"],
     },
     {
       id: "7",
       title: "Tokyo Ghoul",
-      imageUrl:
-        "https://images.unsplash.com/photo-1612036782180-6f0b6cd846fe?w=400&q=80",
+      image_url: "https://images.unsplash.com/photo-1612036782180-6f0b6cd846fe?w=400&q=80",
       rating: 4.3,
-      isFavorite: false,
+      is_favorite: false,
+      description: "A college student becomes half-ghoul after a fatal encounter",
+      release_date: "2014-07-04",
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
       genres: ["Action", "Drama", "Horror"],
     },
     {
       id: "8",
       title: "Fullmetal Alchemist: Brotherhood",
-      imageUrl:
-        "https://images.unsplash.com/photo-1614583225154-5fcdda07019e?w=400&q=80",
+      image_url: "https://images.unsplash.com/photo-1614583225154-5fcdda07019e?w=400&q=80",
       rating: 4.9,
-      isFavorite: true,
+      is_favorite: true,
+      description: "Two brothers seek the philosopher's stone",
+      release_date: "2009-04-05",
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
       genres: ["Action", "Adventure", "Drama"],
     },
   ]);
@@ -117,17 +158,15 @@ export default function HomeScreen() {
     // Apply sorting
     return result.sort((a, b) => {
       if (currentSortOrder === "asc") {
-        return a.rating - b.rating;
+        return (a.rating ?? 0) - (b.rating ?? 0);
       } else {
-        return b.rating - a.rating;
+        return (b.rating ?? 0) - (a.rating ?? 0);
       }
     });
   }, [animeList, selectedGenres, currentSortOrder]);
 
   // Simulate loading state
   const [isLoading, setIsLoading] = useState(false);
-
-  // No need for the useEffect since we're using useMemo now
 
   // Handle user profile press
   const handleProfilePress = () => {
@@ -263,58 +302,52 @@ export default function HomeScreen() {
   };
 
   // Handle anime press
-  const handleAnimePress = (id: string) => {
-    console.log(`Anime pressed: ${id}`);
+  const handleAnimePress = useCallback((anime: Anime) => {
+    console.log(`Anime pressed: ${anime.id}`);
     // Navigate to anime details
-    Alert.alert("Anime Details", `Viewing details for anime ID: ${id}`);
-  };
+    Alert.alert("Anime Details", `Viewing details for anime: ${anime.title}`);
+  }, []);
 
   // Handle add to list
-  const handleAddToList = (id: string) => {
+  const handleAddToList = useCallback((anime: Anime) => {
     if (!isAuthenticated) {
       setShowAuthModal(true);
       return;
     }
 
-    const anime = animeList.find((item) => item.id === id);
-    if (anime) {
-      Alert.alert("Add to List", `Add "${anime.title}" to your list`, [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Watchlist",
-          onPress: () => console.log(`Added ${id} to watchlist`),
-        },
-        {
-          text: "Favorites",
-          onPress: () => console.log(`Added ${id} to favorites`),
-        },
-        {
-          text: "Currently Watching",
-          onPress: () => console.log(`Added ${id} to currently watching`),
-        },
-      ]);
-    }
-  };
+    Alert.alert("Add to List", `Add "${anime.title}" to your list`, [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Watchlist",
+        onPress: () => console.log(`Added ${anime.id} to watchlist`),
+      },
+      {
+        text: "Favorites",
+        onPress: () => console.log(`Added ${anime.id} to favorites`),
+      },
+      {
+        text: "Currently Watching",
+        onPress: () => console.log(`Added ${anime.id} to currently watching`),
+      },
+    ]);
+  }, [isAuthenticated]);
 
   // Handle favorite toggle
-  const handleFavorite = (id: string) => {
+  const handleFavorite = useCallback((anime: Anime) => {
     if (!isAuthenticated) {
       setShowAuthModal(true);
       return;
     }
 
     setAnimeList((prevList) =>
-      prevList.map((anime) =>
-        anime.id === id ? { ...anime, isFavorite: !anime.isFavorite } : anime,
+      prevList.map((item) =>
+        item.id === anime.id ? { ...item, is_favorite: !item.is_favorite } : item,
       ),
     );
 
-    const anime = animeList.find((item) => item.id === id);
-    if (anime) {
-      const action = anime.isFavorite ? "removed from" : "added to";
-      Alert.alert("Favorites", `"${anime.title}" ${action} favorites`);
-    }
-  };
+    const action = anime.is_favorite ? "removed from" : "added to";
+    Alert.alert("Favorites", `"${anime.title}" ${action} favorites`);
+  }, [isAuthenticated]);
 
   // Handle filter change
   const handleFilterChange = (filters: string[]) => {
@@ -329,17 +362,17 @@ export default function HomeScreen() {
   };
 
   // Handle load more
-  const handleLoadMore = () => {
-    if (!isLoading) {
+  const handleLoadMore = useCallback(() => {
+    if (!isLoading && filteredAnimeList.length >= 8) {
       setIsLoading(true);
       // Simulate loading more data
       setTimeout(() => {
         setIsLoading(false);
+        // Don't show "End of List" alert
         // Add more anime to the list if needed
-        Alert.alert("End of List", "No more anime to load");
       }, 1500);
     }
-  };
+  }, [isLoading, filteredAnimeList.length]);
 
   // Handle refresh with pull-to-refresh gesture
   const handleRefresh = useCallback(() => {
@@ -359,14 +392,6 @@ export default function HomeScreen() {
       // Shuffle the anime list to simulate new data
       setAnimeList((prev) => [...prev].sort(() => Math.random() - 0.5));
       setIsLoading(false);
-
-      // Show a toast or some indication that refresh is complete
-      Alert.alert(
-        "Refreshed",
-        "Content updated with latest anime",
-        [{ text: "OK", onPress: () => {} }],
-        { cancelable: true },
-      );
     }, 1500);
   }, []);
 
@@ -383,42 +408,52 @@ export default function HomeScreen() {
     ]);
   };
 
+  const { user, isLoading: authLoading } = useAuth();
+
   return (
-    <SafeAreaView className="flex-1 bg-gray-900">
-      <StatusBar barStyle="light-content" backgroundColor="#111827" />
-      <View className="flex-1">
-        <Header
-          onProfilePress={handleProfilePress}
+    <SafeAreaView style={{ flex: 1, backgroundColor: '#171717' }}>
+      <StatusBar barStyle="light-content" backgroundColor="#171717" />
+      <View style={{ flex: 1 }}>
+        <Header 
+          title="AnimeTempo"
+          showBack={false}
+          showSearch={true}
+          showNotifications={true}
+          showMenu={true}
           onSearchPress={handleSearchPress}
+          onNotificationsPress={() => handleMenuItemPress("notifications")}
           onMenuPress={handleMenuPress}
-          onNotificationPress={() => handleMenuItemPress("notifications")}
-          isAuthenticated={isAuthenticated}
-          hasNotifications={false}
         />
         <FilterBar
-          onFilterChange={handleFilterChange}
-          onSortChange={handleSortChange}
-          onFilterButtonPress={handleFilterButtonPress}
+          filters={filterOptions.map(option => option.value)}
+          selectedFilters={selectedGenres}
+          onFilterPress={(filter) => {
+            // Toggle the filter in the selectedGenres array
+            if (selectedGenres.includes(filter)) {
+              handleFilterChange(selectedGenres.filter(genre => genre !== filter));
+            } else {
+              handleFilterChange([...selectedGenres, filter]);
+            }
+          }}
+          isLoading={isLoading}
         />
-        <View className="flex-1 pb-[70px]">
+        <View style={{ flex: 1, paddingBottom: Platform.OS === 'ios' ? 80 : 60 }}>
           <AnimeGrid
             data={filteredAnimeList}
-            isLoading={isLoading}
-            onLoadMore={handleLoadMore}
+            loading={isLoading}
+            refreshing={isLoading}
             onRefresh={handleRefresh}
+            onEndReached={handleLoadMore}
             onAnimePress={handleAnimePress}
             onAddToList={handleAddToList}
             onFavorite={handleFavorite}
+            numColumns={2}
           />
         </View>
-        <BottomNavigation activeTab={activeTab} onTabChange={setActiveTab} />
         {showAuthModal && (
           <AuthModal
             visible={showAuthModal}
             onClose={() => setShowAuthModal(false)}
-            onLogin={handleLogin}
-            onRegister={handleRegister}
-            onSocialLogin={handleSocialLogin}
           />
         )}
         <MenuDrawer

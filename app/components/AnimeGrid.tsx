@@ -1,164 +1,177 @@
-import React, { useState, useCallback, useRef, memo } from "react";
+import React from "react";
 import {
-  View,
-  Text,
   FlatList,
-  ActivityIndicator,
   RefreshControl,
+  ListRenderItem,
+  Dimensions,
+  View,
+  ActivityIndicator,
+  Text,
+  StyleSheet,
+  Platform
 } from "react-native";
-import AnimeCard from "./AnimeCard";
+import AnimeCard from "@/components/AnimeCard";
+import { useTheme } from "@/context/ThemeProvider";
+import type { Database } from "@/lib/database.types";
 
-interface Anime {
-  id: string;
-  title: string;
-  imageUrl: string;
-  rating: number;
-  isFavorite: boolean;
-}
+type Tables = Database["public"]["Tables"];
+type Anime = Tables["anime"]["Row"] & {
+  is_favorite?: boolean;
+};
 
 interface AnimeGridProps {
-  data?: Anime[];
-  isLoading?: boolean;
-  onLoadMore?: () => void;
+  data: Anime[];
+  loading?: boolean;
+  refreshing?: boolean;
   onRefresh?: () => void;
-  onAnimePress?: (id: string) => void;
-  onAddToList?: (id: string) => void;
-  onFavorite?: (id: string) => void;
+  onEndReached?: () => void;
+  onAnimePress?: (anime: Anime) => void;
+  onAddToList?: (anime: Anime) => void;
+  onFavorite?: (anime: Anime) => void;
+  ListEmptyComponent?: React.ReactElement;
+  ListHeaderComponent?: React.ReactElement;
+  numColumns?: number;
 }
 
-const AnimeGrid = memo(({
-  data = [
-    {
-      id: "1",
-      title: "Attack on Titan",
-      imageUrl:
-        "https://images.unsplash.com/photo-1541562232579-512a21360020?w=400&q=80",
-      rating: 4.8,
-      isFavorite: true,
-    },
-    {
-      id: "2",
-      title: "My Hero Academia",
-      imageUrl:
-        "https://images.unsplash.com/photo-1560972550-aba3456b5564?w=400&q=80",
-      rating: 4.6,
-      isFavorite: false,
-    },
-    {
-      id: "3",
-      title: "Demon Slayer",
-      imageUrl:
-        "https://images.unsplash.com/photo-1578632767115-351597cf2477?w=400&q=80",
-      rating: 4.9,
-      isFavorite: true,
-    },
-    {
-      id: "4",
-      title: "One Piece",
-      imageUrl:
-        "https://images.unsplash.com/photo-1607604276583-eef5d076aa5f?w=400&q=80",
-      rating: 4.7,
-      isFavorite: false,
-    },
-    {
-      id: "5",
-      title: "Jujutsu Kaisen",
-      imageUrl:
-        "https://images.unsplash.com/photo-1618336753974-aae8e04506aa?w=400&q=80",
-      rating: 4.8,
-      isFavorite: false,
-    },
-    {
-      id: "6",
-      title: "Naruto Shippuden",
-      imageUrl:
-        "https://images.unsplash.com/photo-1601850494422-3cf14624b0b3?w=400&q=80",
-      rating: 4.5,
-      isFavorite: true,
-    },
-  ],
-  isLoading = false,
-  onLoadMore = () => {},
-  onRefresh = () => {},
-  onAnimePress = () => {},
-  onAddToList = () => {},
-  onFavorite = () => {},
-}: AnimeGridProps) => {
-  const [refreshing, setRefreshing] = useState(false);
-  const flatListRef = useRef<FlatList>(null);
+/**
+ * AnimeGrid component displays a grid of anime cards with support for
+ * refreshing, pagination, and interactions.
+ *
+ * @param props - Component props
+ * @returns AnimeGrid component
+ */
+const AnimeGrid = React.memo(function AnimeGrid({
+  data,
+  loading = false,
+  refreshing = false,
+  onRefresh,
+  onEndReached,
+  onAnimePress,
+  onAddToList,
+  onFavorite,
+  ListEmptyComponent,
+  ListHeaderComponent,
+  numColumns = 2,
+}: AnimeGridProps) {
+  const { colors } = useTheme();
+  const screenWidth = Dimensions.get("window").width;
+  const cardWidth = (screenWidth - 32) / numColumns; // 32 = padding (16) * 2
 
-  const handleRefresh = useCallback(() => {
-    setRefreshing(true);
-    onRefresh();
-    // Simulate refresh completion after 1.5 seconds
-    setTimeout(() => setRefreshing(false), 1500);
-  }, [onRefresh]);
-
-  const renderItem = ({ item }: { item: Anime }) => (
-    <AnimeCard
-      id={item.id}
-      title={item.title}
-      imageUrl={item.imageUrl}
-      rating={item.rating}
-      isFavorite={item.isFavorite}
-      onPress={() => onAnimePress(item.id)}
-      onAddToList={() => onAddToList(item.id)}
-      onFavorite={() => onFavorite(item.id)}
-    />
+  const renderItem: ListRenderItem<Anime> = ({ item }) => (
+    <View style={[styles.cardContainer, { width: cardWidth }]}>
+      <AnimeCard
+        id={item.id}
+        title={item.title}
+        imageUrl={item.image_url}
+        rating={item.rating ?? undefined}
+        isFavorite={item.is_favorite}
+        onPress={() => onAnimePress?.(item)}
+        onFavoritePress={() => onFavorite?.(item)}
+      />
+    </View>
   );
 
-  const renderFooter = () => {
-    if (!isLoading) return null;
-    return (
-      <View className="py-4 w-full items-center justify-center">
-        <ActivityIndicator size="large" color="#6366F1" />
-      </View>
-    );
-  };
+  const keyExtractor = (item: Anime) => item.id.toString();
 
+  // Custom empty component that doesn't show "End of List"
   const renderEmpty = () => {
-    if (isLoading) return null;
+    if (loading && !refreshing) {
+      return (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={colors.primary} />
+        </View>
+      );
+    }
+    
     return (
-      <View className="flex-1 items-center justify-center py-10">
-        <Text className="text-gray-400 text-lg">No anime found</Text>
-        <Text className="text-gray-500 text-sm mt-2">
-          Try adjusting your filters
+      <View style={styles.emptyContainer}>
+        <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
+          No anime found. Check back later for updates.
         </Text>
       </View>
     );
   };
 
+  if (loading && !refreshing && data.length === 0) {
+    return (
+      <View style={[styles.fullScreenLoading, { backgroundColor: colors.background }]}>
+        <ActivityIndicator size="large" color={colors.primary} />
+      </View>
+    );
+  }
+
   return (
-    <View className="flex-1 bg-gray-900">
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       <FlatList
-        ref={flatListRef}
         data={data}
         renderItem={renderItem}
-        keyExtractor={(item) => item.id}
-        numColumns={2}
-        columnWrapperStyle={{
-          justifyContent: "space-between",
-          paddingHorizontal: 8,
-        }}
-        contentContainerStyle={{ paddingVertical: 8 }}
+        keyExtractor={keyExtractor}
+        numColumns={numColumns}
+        contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
-        onEndReached={onLoadMore}
+        onEndReached={onEndReached}
         onEndReachedThreshold={0.5}
-        ListFooterComponent={renderFooter}
-        ListEmptyComponent={renderEmpty}
         refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={handleRefresh}
-            colors={["#6366F1"]}
-            tintColor="#6366F1"
-          />
+          onRefresh ? (
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor={colors.primary}
+              colors={[colors.primary]}
+            />
+          ) : undefined
+        }
+        ListEmptyComponent={ListEmptyComponent || renderEmpty}
+        ListHeaderComponent={ListHeaderComponent}
+        ListFooterComponent={
+          loading && data.length > 0 ? (
+            <View style={styles.footerLoading}>
+              <ActivityIndicator size="small" color={colors.primary} />
+            </View>
+          ) : null
         }
       />
     </View>
   );
-};
+});
 
-});  // Close memo
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
+  cardContainer: {
+    padding: 8,
+  },
+  listContent: {
+    paddingHorizontal: 16,
+    paddingBottom: Platform.OS === 'ios' ? 100 : 80,
+    paddingTop: 8,
+  },
+  loadingContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 40,
+  },
+  emptyContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 40,
+  },
+  emptyText: {
+    textAlign: 'center',
+    fontSize: 14,
+  },
+  fullScreenLoading: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  footerLoading: {
+    paddingVertical: 16,
+    alignItems: 'center',
+  },
+});
 
 export default AnimeGrid;
