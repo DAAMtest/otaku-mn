@@ -1,8 +1,16 @@
-import React, { useEffect, useRef } from "react";
-import { View, Image, TouchableOpacity, StyleSheet, Animated, Platform } from "react-native";
-import { Star, Heart } from "lucide-react-native";
+import React, { useRef } from "react";
+import {
+  View,
+  Image,
+  TouchableOpacity,
+  StyleSheet,
+  Animated,
+  Platform,
+} from "react-native";
+import { Star, Heart, Clock } from "lucide-react-native";
 import { useTheme } from "@/context/ThemeProvider";
 import Typography from "./Typography";
+import { router } from "expo-router";
 
 interface AnimeCardProps {
   id: string;
@@ -14,6 +22,9 @@ interface AnimeCardProps {
   onFavoritePress?: () => void;
   size?: "small" | "medium" | "large";
   isLoading?: boolean;
+  episodeCount?: number;
+  releaseYear?: number;
+  isNew?: boolean;
 }
 
 /**
@@ -30,10 +41,13 @@ const AnimeCard = React.memo(function AnimeCard({
   onFavoritePress,
   size = "medium",
   isLoading = false,
+  episodeCount,
+  releaseYear,
+  isNew = false,
 }: AnimeCardProps) {
   const { colors } = useTheme();
   const scaleAnim = useRef(new Animated.Value(1)).current;
-  
+
   // Determine card dimensions based on size prop
   const dimensions = {
     small: { width: 120, height: 180 },
@@ -42,7 +56,7 @@ const AnimeCard = React.memo(function AnimeCard({
   };
 
   const { width, height } = dimensions[size];
-  
+
   // Handle press animation
   const handlePressIn = () => {
     Animated.spring(scaleAnim, {
@@ -52,7 +66,7 @@ const AnimeCard = React.memo(function AnimeCard({
       bounciness: 4,
     }).start();
   };
-  
+
   const handlePressOut = () => {
     Animated.spring(scaleAnim, {
       toValue: 1,
@@ -61,7 +75,20 @@ const AnimeCard = React.memo(function AnimeCard({
       bounciness: 4,
     }).start();
   };
-  
+
+  // Handle card press - navigate to anime details or watch screen
+  const handleCardPress = () => {
+    if (onPress) {
+      onPress();
+    } else if (id) {
+      // Navigate to watch screen with this anime
+      router.push({
+        pathname: "/watch",
+        params: { animeId: id, episodeId: "1" },
+      });
+    }
+  };
+
   // Handle favorite button press with haptic feedback
   const handleFavoritePress = () => {
     // Add haptic feedback
@@ -71,43 +98,43 @@ const AnimeCard = React.memo(function AnimeCard({
     } catch (error) {
       // Haptics not available, continue silently
     }
-    
+
     onFavoritePress?.();
   };
 
   // Skeleton loading state
   if (isLoading) {
     return (
-      <View 
+      <View
         style={[
-          styles.container, 
-          { 
+          styles.container,
+          {
             width,
             backgroundColor: colors.skeleton,
             borderRadius: 8,
-            overflow: 'hidden',
-          }
+            overflow: "hidden",
+          },
         ]}
       >
-        <View 
+        <View
           style={[
-            styles.image, 
-            { 
-              width, 
-              height, 
-              backgroundColor: colors.skeleton 
-            }
-          ]} 
+            styles.image,
+            {
+              width,
+              height,
+              backgroundColor: colors.skeleton,
+            },
+          ]}
         />
         <View style={styles.titleContainer}>
-          <View 
+          <View
             style={[
-              styles.skeletonText, 
-              { 
+              styles.skeletonText,
+              {
                 backgroundColor: colors.cardHover,
                 width: width * 0.8,
-              }
-            ]} 
+              },
+            ]}
           />
         </View>
       </View>
@@ -121,13 +148,13 @@ const AnimeCard = React.memo(function AnimeCard({
       }}
     >
       <TouchableOpacity
-        onPress={onPress}
+        onPress={handleCardPress}
         onPressIn={handlePressIn}
         onPressOut={handlePressOut}
         activeOpacity={0.9}
         style={[styles.container, { width }]}
         accessible={true}
-        accessibilityLabel={`${title}, Rating: ${rating}, ${isFavorite ? 'In favorites' : 'Not in favorites'}`}
+        accessibilityLabel={`${title}, Rating: ${rating}, ${isFavorite ? "In favorites" : "Not in favorites"}`}
         accessibilityRole="button"
         accessibilityHint="Opens anime details"
       >
@@ -135,8 +162,8 @@ const AnimeCard = React.memo(function AnimeCard({
           <Image
             source={{ uri: imageUrl }}
             style={[
-              styles.image, 
-              { width, height, backgroundColor: colors.background }
+              styles.image,
+              { width, height, backgroundColor: colors.background },
             ]}
             resizeMode="cover"
             accessibilityIgnoresInvertColors={true}
@@ -144,14 +171,34 @@ const AnimeCard = React.memo(function AnimeCard({
 
           {/* Rating badge */}
           {rating > 0 && (
-            <View style={[styles.ratingBadge, { backgroundColor: 'rgba(0,0,0,0.7)' }]}>
+            <View
+              style={[
+                styles.ratingBadge,
+                { backgroundColor: "rgba(0,0,0,0.7)" },
+              ]}
+            >
               <Star size={12} color="#FFD700" style={styles.starIcon} />
-              <Typography 
-                variant="caption" 
+              <Typography
+                variant="caption"
                 color="#FFFFFF"
                 style={styles.ratingText}
               >
                 {rating.toFixed(1)}
+              </Typography>
+            </View>
+          )}
+
+          {/* New badge */}
+          {isNew && (
+            <View
+              style={[styles.newBadge, { backgroundColor: colors.secondary }]}
+            >
+              <Typography
+                variant="caption"
+                color="#FFFFFF"
+                style={styles.badgeText}
+              >
+                NEW
               </Typography>
             </View>
           )}
@@ -162,7 +209,9 @@ const AnimeCard = React.memo(function AnimeCard({
             style={styles.favoriteButton}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             accessible={true}
-            accessibilityLabel={isFavorite ? 'Remove from favorites' : 'Add to favorites'}
+            accessibilityLabel={
+              isFavorite ? "Remove from favorites" : "Add to favorites"
+            }
             accessibilityRole="button"
           >
             <Heart
@@ -182,6 +231,30 @@ const AnimeCard = React.memo(function AnimeCard({
           >
             {title}
           </Typography>
+
+          {/* Additional info row */}
+          {(episodeCount || releaseYear) && (
+            <View style={styles.infoContainer}>
+              {episodeCount && (
+                <View style={styles.infoItem}>
+                  <Clock
+                    size={12}
+                    color={colors.textSecondary}
+                    style={styles.infoIcon}
+                  />
+                  <Typography variant="caption" color={colors.textSecondary}>
+                    {episodeCount} ep
+                  </Typography>
+                </View>
+              )}
+
+              {releaseYear && (
+                <Typography variant="caption" color={colors.textSecondary}>
+                  {releaseYear}
+                </Typography>
+              )}
+            </View>
+          )}
         </View>
       </TouchableOpacity>
     </Animated.View>
@@ -191,43 +264,68 @@ const AnimeCard = React.memo(function AnimeCard({
 const styles = StyleSheet.create({
   container: {
     borderRadius: 8,
-    overflow: 'hidden',
+    overflow: "hidden",
     marginBottom: 12,
-    backgroundColor: 'transparent',
+    backgroundColor: "transparent",
   },
   imageContainer: {
-    position: 'relative',
+    position: "relative",
   },
   image: {
     borderRadius: 8,
   },
   ratingBadge: {
-    position: 'absolute',
+    position: "absolute",
     top: 8,
     left: 8,
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     borderRadius: 20,
     paddingHorizontal: 8,
     paddingVertical: 4,
+  },
+  newBadge: {
+    position: "absolute",
+    top: 8,
+    left: rating > 0 ? 70 : 8,
+    borderRadius: 20,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  badgeText: {
+    fontWeight: "700",
+    fontSize: 10,
   },
   starIcon: {
     marginRight: 4,
   },
   ratingText: {
-    fontWeight: '500',
+    fontWeight: "500",
   },
   favoriteButton: {
-    position: 'absolute',
+    position: "absolute",
     top: 8,
     right: 8,
-    backgroundColor: 'rgba(0,0,0,0.7)',
+    backgroundColor: "rgba(0,0,0,0.7)",
     borderRadius: 20,
     padding: 6,
   },
   titleContainer: {
     marginTop: 8,
     paddingHorizontal: 4,
+  },
+  infoContainer: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginTop: 4,
+  },
+  infoItem: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  infoIcon: {
+    marginRight: 4,
   },
   skeletonText: {
     height: 14,

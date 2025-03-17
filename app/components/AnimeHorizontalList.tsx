@@ -1,13 +1,25 @@
 import React from "react";
-import { FlatList, ListRenderItem, View, Text, TouchableOpacity, ActivityIndicator, StyleSheet } from "react-native";
+import {
+  FlatList,
+  ListRenderItem,
+  View,
+  Text,
+  TouchableOpacity,
+  ActivityIndicator,
+  StyleSheet,
+} from "react-native";
 import { ChevronRight } from "lucide-react-native";
 import AnimeCard from "@/components/AnimeCard";
 import { useTheme } from "@/context/ThemeProvider";
+import { router } from "expo-router";
 import type { Database } from "@/lib/database.types";
 
 type Tables = Database["public"]["Tables"];
 type Anime = Tables["anime"]["Row"] & {
   is_favorite?: boolean;
+  episode_count?: number;
+  release_year?: number;
+  is_new?: boolean;
 };
 
 interface AnimeHorizontalListProps {
@@ -33,18 +45,35 @@ const AnimeHorizontalList = React.memo(function AnimeHorizontalList({
 }: AnimeHorizontalListProps) {
   const { colors } = useTheme();
 
-  const renderItem: ListRenderItem<Anime> = ({ item }) => (
-    <AnimeCard
-      id={item.id}
-      title={item.title}
-      imageUrl={item.image_url}
-      rating={item.rating ?? undefined}
-      isFavorite={item.is_favorite}
-      onPress={() => onAnimePress?.(item)}
-      onFavoritePress={() => onFavorite?.(item)}
-      size="medium"
-    />
-  );
+  const renderItem: ListRenderItem<Anime> = ({ item }) => {
+    const handlePress = () => {
+      if (onAnimePress) {
+        onAnimePress(item);
+      } else {
+        // Navigate to watch screen
+        router.push({
+          pathname: "/watch",
+          params: { animeId: item.id, episodeId: "1" },
+        });
+      }
+    };
+
+    return (
+      <AnimeCard
+        id={item.id}
+        title={item.title}
+        imageUrl={item.image_url}
+        rating={item.rating ?? undefined}
+        isFavorite={item.is_favorite}
+        episodeCount={item.episode_count}
+        releaseYear={item.release_year}
+        isNew={item.is_new}
+        onPress={handlePress}
+        onFavoritePress={() => onFavorite?.(item)}
+        size="medium"
+      />
+    );
+  };
 
   const renderEmpty = () => {
     if (loading) {
@@ -68,19 +97,21 @@ const AnimeHorizontalList = React.memo(function AnimeHorizontalList({
     <View style={styles.container}>
       <View style={styles.headerContainer}>
         <Text style={[styles.title, { color: colors.text }]}>{title}</Text>
-        
+
         {onSeeAllPress && (
           <TouchableOpacity
             style={styles.seeAllButton}
             onPress={onSeeAllPress}
             activeOpacity={0.7}
           >
-            <Text style={[styles.seeAllText, { color: colors.primary }]}>See All</Text>
+            <Text style={[styles.seeAllText, { color: colors.primary }]}>
+              See All
+            </Text>
             <ChevronRight size={16} color={colors.primary} />
           </TouchableOpacity>
         )}
       </View>
-      
+
       <FlatList
         data={data}
         renderItem={renderItem}
@@ -101,19 +132,19 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   headerContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     paddingHorizontal: 16,
     marginBottom: 8,
   },
   title: {
     fontSize: 18,
-    fontWeight: 'bold',
+    fontWeight: "bold",
   },
   seeAllButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
   },
   seeAllText: {
     fontSize: 14,
@@ -127,21 +158,21 @@ const styles = StyleSheet.create({
     width: 12,
   },
   loadingContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     paddingVertical: 40,
     paddingHorizontal: 16,
     width: 240,
   },
   emptyContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     paddingVertical: 40,
     paddingHorizontal: 16,
     width: 240,
   },
   emptyText: {
-    textAlign: 'center',
+    textAlign: "center",
     fontSize: 14,
   },
 });
