@@ -8,7 +8,6 @@ import AuthModal from "@/auth/components/AuthModal";
 import MenuDrawer from "@/components/MenuDrawer";
 import { useAuth } from "@/context/AuthContext";
 import type { Database } from "@/lib/database.types";
-import BottomNavigation from "@/components/BottomNavigation";
 
 type Tables = Database["public"]["Tables"];
 type Anime = Tables["anime"]["Row"] & {
@@ -171,12 +170,15 @@ export default function HomeScreen() {
       );
     }
 
-    // Apply sorting
+    // Apply sorting - ensure rating is a number or default to 0
     return result.sort((a, b) => {
+      const ratingA = typeof a.rating === "number" ? a.rating : 0;
+      const ratingB = typeof b.rating === "number" ? b.rating : 0;
+
       if (currentSortOrder === "asc") {
-        return (a.rating ?? 0) - (b.rating ?? 0);
+        return ratingA - ratingB;
       } else {
-        return (b.rating ?? 0) - (a.rating ?? 0);
+        return ratingB - ratingA;
       }
     });
   }, [animeList, selectedGenres, currentSortOrder]);
@@ -497,7 +499,6 @@ export default function HomeScreen() {
               : undefined
           }
         />
-        <BottomNavigation currentRoute={currentRoute} />
       </View>
     </SafeAreaView>
   );

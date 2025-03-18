@@ -41,11 +41,13 @@ function RootLayoutContent() {
   return (
     <AuthProvider>
       <GestureHandlerRootView style={{ flex: 1 }}>
-        <View style={{ 
-          flex: 1, 
-          backgroundColor: colors.background,
-          paddingBottom: Platform.OS === 'ios' ? 80 : 60 // Add padding to account for bottom navigation
-        }}>
+        <View
+          style={{
+            flex: 1,
+            backgroundColor: colors.background,
+            paddingBottom: Platform.OS === "ios" ? 80 : 60, // Add padding to account for bottom navigation
+          }}
+        >
           <Slot />
           <BottomNavigation currentRoute={pathname} />
         </View>
