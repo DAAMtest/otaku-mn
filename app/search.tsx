@@ -24,6 +24,7 @@ import AnimeGrid from "./components/AnimeGrid";
 import AuthModal from "./auth/components/AuthModal";
 import { useAuth } from "./context/AuthContext";
 import { useTheme } from "./context/ThemeProvider";
+import BottomNavigation from "./components/BottomNavigation";
 import FilterBar from "./components/FilterBar";
 import type { Database } from "@/lib/database.types";
 
@@ -531,6 +532,14 @@ export default function SearchScreen() {
           visible={showAuthModal}
           onClose={() => setShowAuthModal(false)}
         />
+
+        {!isKeyboardVisible && (
+          <BottomNavigation
+            currentRoute="/search"
+            activeTab={activeTab}
+            onTabChange={setActiveTab}
+          />
+        )}
       </View>
     </SafeAreaView>
   );

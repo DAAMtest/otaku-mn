@@ -21,6 +21,7 @@ import {
   MoreVertical,
   Star,
 } from "lucide-react-native";
+import BottomNavigation from "./components/BottomNavigation";
 
 interface AnimeListItem {
   id: string;
@@ -429,6 +430,8 @@ export default function ListsScreen() {
             />
           )}
         </View>
+
+        <BottomNavigation activeTab={activeTab} onTabChange={setActiveTab} />
       </View>
     </SafeAreaView>
   );

@@ -10,6 +10,7 @@ import {
 import { useRouter } from "expo-router";
 import { ArrowLeft } from "lucide-react-native";
 import AnimeGrid from "./components/AnimeGrid";
+import BottomNavigation from "./components/BottomNavigation";
 import FilterBar from "./components/FilterBar";
 import useAnimeData from "./hooks/useAnimeData";
 import { useAuth } from "./context/AuthContext";
@@ -46,7 +47,7 @@ export default function TrendingScreen() {
   // Update filtered anime when trendingAnime, selectedGenres, or sortOrder changes
   useEffect(() => {
     // Convert trendingAnime to AnimeGridItem format
-    const convertedAnime: AnimeGridItem[] = trendingAnime.map((anime) => ({
+    const convertedAnime: AnimeGridItem[] = trendingAnime.map(anime => ({
       id: anime.id,
       title: anime.title,
       image_url: anime.imageUrl,
@@ -56,9 +57,9 @@ export default function TrendingScreen() {
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
       is_favorite: anime.isFavorite,
-      type: anime.type,
+      type: anime.type
     }));
-
+    
     let result = [...convertedAnime];
 
     // Apply genre filters if any are selected
@@ -70,10 +71,8 @@ export default function TrendingScreen() {
 
     // Apply filters
     if (selectedFilters.length > 0) {
-      result = result.filter(
-        (anime) =>
-          selectedFilters.includes("All") ||
-          (anime.type && selectedFilters.includes(anime.type)),
+      result = result.filter((anime) =>
+        selectedFilters.includes("All") || (anime.type && selectedFilters.includes(anime.type))
       );
     }
 
@@ -202,7 +201,7 @@ export default function TrendingScreen() {
           onFilterPress={(filter) => {
             // Toggle the filter in the selectedFilters array
             if (selectedFilters.includes(filter)) {
-              setSelectedFilters(selectedFilters.filter((f) => f !== filter));
+              setSelectedFilters(selectedFilters.filter(f => f !== filter));
             } else {
               setSelectedFilters([...selectedFilters, filter]);
             }
@@ -222,6 +221,12 @@ export default function TrendingScreen() {
             numColumns={2}
           />
         </View>
+
+        <BottomNavigation
+          currentRoute="/trending"
+          activeTab={activeTab}
+          onTabChange={setActiveTab}
+        />
 
         {showAuthModal && (
           <AuthModal

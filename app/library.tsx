@@ -24,6 +24,7 @@ import {
   Filter,
 } from "lucide-react-native";
 import { useTheme } from "@/context/ThemeProvider";
+import BottomNavigation from "@/components/BottomNavigation";
 import { useAuth } from "@/context/AuthContext";
 
 interface AnimeListItem {
@@ -695,6 +696,11 @@ export default function LibraryScreen() {
           />
         </View>
 
+        <BottomNavigation
+          currentRoute="/library"
+          activeTab={activeTab}
+          onTabChange={setActiveTab}
+        />
       </View>
     </SafeAreaView>
   );

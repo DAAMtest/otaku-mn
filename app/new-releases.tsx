@@ -10,6 +10,7 @@ import {
 import { useRouter } from "expo-router";
 import { ArrowLeft } from "lucide-react-native";
 import AnimeGrid from "./components/AnimeGrid";
+import BottomNavigation from "./components/BottomNavigation";
 import FilterBar from "./components/FilterBar";
 import useAnimeData from "./hooks/useAnimeData";
 import { useAuth } from "./context/AuthContext";
@@ -46,7 +47,7 @@ export default function NewReleasesScreen() {
   // Update filtered anime when newReleases, selectedGenres, or sortOrder changes
   useEffect(() => {
     // Convert newReleases to AnimeGridItem format
-    const convertedReleases: AnimeGridItem[] = newReleases.map((anime) => ({
+    const convertedReleases: AnimeGridItem[] = newReleases.map(anime => ({
       id: anime.id,
       title: anime.title,
       image_url: anime.imageUrl,
@@ -55,9 +56,9 @@ export default function NewReleasesScreen() {
       release_date: anime.releaseDate || null,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
-      is_favorite: anime.isFavorite,
+      is_favorite: anime.isFavorite
     }));
-
+    
     let result = [...convertedReleases];
 
     // Apply genre filters if any are selected
@@ -69,10 +70,8 @@ export default function NewReleasesScreen() {
 
     // Apply filters
     if (selectedFilters.length > 0) {
-      result = result.filter(
-        (anime) =>
-          selectedFilters.includes("All") ||
-          (anime.type && selectedFilters.includes(anime.type)),
+      result = result.filter((anime) =>
+        selectedFilters.includes("All") || (anime.type && selectedFilters.includes(anime.type))
       );
     }
 
@@ -201,7 +200,7 @@ export default function NewReleasesScreen() {
           onFilterPress={(filter) => {
             // Toggle the filter in the selectedFilters array
             if (selectedFilters.includes(filter)) {
-              setSelectedFilters(selectedFilters.filter((f) => f !== filter));
+              setSelectedFilters(selectedFilters.filter(f => f !== filter));
             } else {
               setSelectedFilters([...selectedFilters, filter]);
             }
@@ -221,6 +220,12 @@ export default function NewReleasesScreen() {
             numColumns={2}
           />
         </View>
+
+        <BottomNavigation
+          currentRoute="/new-releases"
+          activeTab={activeTab}
+          onTabChange={setActiveTab}
+        />
 
         {showAuthModal && (
           <AuthModal

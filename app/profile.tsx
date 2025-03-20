@@ -63,12 +63,12 @@ export default function ProfileScreen() {
 
   // Handle edit profile
   const handleEditProfile = () => {
-    Alert.alert("Edit Profile", "Edit profile functionality coming soon");
+    router.push("/edit-profile");
   };
 
   // Handle settings
   const handleSettings = () => {
-    Alert.alert("Settings", "Settings functionality coming soon");
+    router.push("/settings");
   };
 
   // Handle list navigation

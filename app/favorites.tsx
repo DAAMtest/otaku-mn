@@ -21,6 +21,7 @@ import {
   Eye,
 } from "lucide-react-native";
 import { useTheme } from "@/context/ThemeProvider";
+import BottomNavigation from "@/components/BottomNavigation";
 import { useAuth } from "@/context/AuthContext";
 
 interface AnimeItem {
@@ -387,6 +388,12 @@ export default function FavoritesScreen() {
           ListEmptyComponent={renderEmptyComponent}
           onRefresh={fetchFavorites}
           refreshing={loading}
+        />
+
+        <BottomNavigation
+          currentRoute="/favorites"
+          activeTab={activeTab}
+          onTabChange={setActiveTab}
         />
       </View>
     </SafeAreaView>
