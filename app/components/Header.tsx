@@ -10,13 +10,7 @@ import {
   SafeAreaView,
 } from "react-native";
 import { useRouter } from "expo-router";
-import {
-  ArrowLeft,
-  Search,
-  Bell,
-  Menu as MenuIcon,
-  Home,
-} from "lucide-react-native";
+import { ArrowLeft, Bell, Home } from "lucide-react-native";
 import { useTheme } from "@/context/ThemeProvider";
 import Typography from "./Typography";
 import { useToast } from "@/context/ToastContext";
@@ -242,24 +236,6 @@ const Header = ({
             </View>
 
             <View style={styles.rightContainer}>
-              {showSearch && (
-                <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
-                  <TouchableOpacity
-                    onPress={handleSearchPress}
-                    style={[
-                      styles.iconButton,
-                      { backgroundColor: colors.cardHover },
-                    ]}
-                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                    accessibilityRole="button"
-                    accessibilityLabel="Search"
-                    activeOpacity={0.7}
-                  >
-                    <Search size={20} color={colors.text} />
-                  </TouchableOpacity>
-                </Animated.View>
-              )}
-
               {showNotifications && (
                 <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
                   <TouchableOpacity
@@ -290,24 +266,6 @@ const Header = ({
                         </Typography>
                       </View>
                     )}
-                  </TouchableOpacity>
-                </Animated.View>
-              )}
-
-              {showMenu && (
-                <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
-                  <TouchableOpacity
-                    onPress={handleMenuPress}
-                    style={[
-                      styles.iconButton,
-                      { backgroundColor: colors.cardHover },
-                    ]}
-                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                    accessibilityRole="button"
-                    accessibilityLabel="Menu"
-                    activeOpacity={0.7}
-                  >
-                    <MenuIcon size={20} color={colors.text} />
                   </TouchableOpacity>
                 </Animated.View>
               )}

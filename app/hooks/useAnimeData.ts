@@ -1,6 +1,8 @@
 import { useState, useEffect } from "react";
 import { supabase } from "../lib/supabase";
-import { Anime } from "./useAnimeSearch";
+import { Anime, UUID } from "./useAnimeSearch";
+
+type UUID = string;
 
 export function useAnimeData() {
   const [genres, setGenres] = useState<string[]>([]);
@@ -121,7 +123,10 @@ export function useAnimeData() {
   };
 
   // Fetch anime by genre
-  const fetchAnimeByGenre = async (genre: string, limit = 10) => {
+  const fetchAnimeByGenre = async (
+    genre: string,
+    limit = 10,
+  ): Promise<Anime[]> => {
     try {
       const { data, error: fetchError } = await supabase
         .from("anime")
@@ -159,7 +164,7 @@ export function useAnimeData() {
   };
 
   // Get anime details by ID
-  const getAnimeDetails = async (animeId: string) => {
+  const getAnimeDetails = async (animeId: UUID) => {
     try {
       const { data, error: fetchError } = await supabase
         .from("anime")

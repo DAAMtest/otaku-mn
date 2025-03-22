@@ -10,7 +10,7 @@ import {
   SafeAreaView,
 } from "react-native";
 import { useRouter, usePathname } from "expo-router";
-import { Home, BookmarkIcon, Heart, User, Search } from "lucide-react-native";
+import { Home, Heart, User, Search } from "lucide-react-native";
 import { useTheme } from "@/context/ThemeProvider";
 
 interface NavItem {
@@ -23,7 +23,6 @@ interface NavItem {
 const navItems: NavItem[] = [
   { name: "Home", href: "/", icon: Home },
   { name: "Search", href: "/search", icon: Search },
-  { name: "Library", href: "/library", icon: BookmarkIcon },
   { name: "Favorites", href: "/favorites", icon: Heart },
   { name: "Profile", href: "/profile", icon: User },
 ];
@@ -38,7 +37,7 @@ const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
 /**
  * BottomNavigation component provides app-wide navigation
- * with home, search, library, favorites and profile options
+ * with home, search, favorites and profile options
  *
  * @returns BottomNavigation component with active state indicators and animations
  */

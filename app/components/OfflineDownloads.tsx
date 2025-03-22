@@ -14,10 +14,12 @@ import Typography from "./Typography";
 
 const DOWNLOADS_STORAGE_KEY = "OFFLINE_DOWNLOADS";
 
+type UUID = string;
+
 interface DownloadedItem {
-  id: string;
-  animeId: string;
-  episodeId: string;
+  id: UUID;
+  animeId: UUID;
+  episodeId: UUID;
   title: string;
   episodeTitle: string;
   thumbnailUri: string;

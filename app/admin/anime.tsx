@@ -30,8 +30,10 @@ import {
 import { supabase } from "../lib/supabase";
 import { useAuth } from "../context/AuthContext";
 
+type UUID = string;
+
 interface Anime {
-  id: string;
+  id: UUID;
   title: string;
   image_url: string;
   rating: number;
