@@ -11,6 +11,7 @@ import type { Database } from "@/lib/database.types";
 import BottomNavigation from "@/components/BottomNavigation";
 
 type Tables = Database["public"]["Tables"];
+type UUID = string;
 type Anime = Tables["anime"]["Row"] & {
   is_favorite?: boolean;
   genres?: string[];

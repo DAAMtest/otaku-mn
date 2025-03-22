@@ -24,8 +24,10 @@ import { useTheme } from "@/context/ThemeProvider";
 import BottomNavigation from "@/components/BottomNavigation";
 import { useAuth } from "@/context/AuthContext";
 
+type UUID = string;
+
 interface AnimeItem {
-  id: string;
+  id: UUID;
   title: string;
   imageUrl: string;
   rating: number;

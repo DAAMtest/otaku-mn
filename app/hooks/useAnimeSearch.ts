@@ -1,8 +1,10 @@
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "../lib/supabase";
 
+type UUID = string;
+
 export interface Anime {
-  id: string;
+  id: UUID;
   title: string;
   imageUrl: string;
   rating: number;

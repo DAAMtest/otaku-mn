@@ -19,7 +19,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 
 // Interface for episode data
 interface Episode {
-  id: string;
+  id: UUID;
   title: string;
   description: string;
   thumbnailUri: string;
@@ -27,8 +27,10 @@ interface Episode {
   duration: string;
 }
 
+type UUID = string;
+
 interface AnimeDetails {
-  id: string;
+  id: UUID;
   title: string;
   season?: string;
   description: string;
@@ -44,7 +46,7 @@ export default function WatchScreen() {
   const { colors } = useTheme();
   const { user } = useAuth();
   const params = useLocalSearchParams<{
-    animeId: string;
+    animeId: UUID;
     episodeId: string;
     isOffline?: string;
     localUri?: string;

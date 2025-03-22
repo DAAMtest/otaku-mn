@@ -14,6 +14,7 @@ import { useTheme } from "@/context/ThemeProvider";
 import { router } from "expo-router";
 import type { Database } from "@/lib/database.types";
 
+type UUID = string;
 type Tables = Database["public"]["Tables"];
 type Anime = Tables["anime"]["Row"] & {
   is_favorite?: boolean;
@@ -50,10 +51,9 @@ const AnimeHorizontalList = React.memo(function AnimeHorizontalList({
       if (onAnimePress) {
         onAnimePress(item);
       } else {
-        // Navigate to watch screen
+        // Navigate to anime details screen
         router.push({
-          pathname: "/watch",
-          params: { animeId: item.id, episodeId: "1" },
+          pathname: `/anime/${item.id}`,
         });
       }
     };

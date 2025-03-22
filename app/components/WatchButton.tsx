@@ -5,9 +5,11 @@ import { router } from "expo-router";
 import Typography from "./Typography";
 import { useTheme } from "@/context/ThemeProvider";
 
+type UUID = string;
+
 interface WatchButtonProps {
-  animeId: string;
-  episodeId?: string;
+  animeId: UUID;
+  episodeId?: UUID;
   label?: string;
   size?: "small" | "medium" | "large";
   style?: any;

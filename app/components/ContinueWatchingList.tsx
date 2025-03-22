@@ -16,8 +16,10 @@ import Typography from "./Typography";
 
 const CONTINUE_WATCHING_KEY = "CONTINUE_WATCHING";
 
+type UUID = string;
+
 interface WatchHistoryItem {
-  animeId: string;
+  animeId: UUID;
   episodeId: string;
   title: string;
   episodeInfo: string;

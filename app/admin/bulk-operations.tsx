@@ -32,8 +32,10 @@ import {
 import { supabase } from "../lib/supabase";
 import { useAuth } from "../context/AuthContext";
 
+type UUID = string;
+
 interface BulkItem {
-  id: string;
+  id: UUID;
   title: string;
   type: string;
   image_url?: string;

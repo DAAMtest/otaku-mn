@@ -23,8 +23,10 @@ import {
 } from "lucide-react-native";
 import BottomNavigation from "./components/BottomNavigation";
 
+type UUID = string;
+
 interface AnimeListItem {
-  id: string;
+  id: UUID;
   title: string;
   imageUrl: string;
   rating: number;
