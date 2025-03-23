@@ -7,7 +7,7 @@ import {
   Animated,
   Platform,
 } from "react-native";
-import { Star, Heart, Clock } from "lucide-react-native";
+import { Star, Heart, Clock, Calendar } from "lucide-react-native";
 import { useTheme } from "@/context/ThemeProvider";
 import Typography from "./Typography";
 import { router } from "expo-router";
@@ -16,7 +16,7 @@ interface AnimeCardProps {
   id: string;
   title: string;
   imageUrl: string;
-  rating?: number;
+  rating: number;
   isFavorite?: boolean;
   onPress?: () => void;
   onFavoritePress?: () => void;
@@ -140,6 +140,9 @@ const AnimeCard = React.memo(function AnimeCard({
     );
   }
 
+  const BADGE_LEFT_OFFSET = 8;
+  const RATING_BADGE_WIDTH = 70;
+
   return (
     <Animated.View
       style={{
@@ -190,7 +193,10 @@ const AnimeCard = React.memo(function AnimeCard({
           {/* New badge */}
           {isNew && (
             <View
-              style={[styles.newBadge, { backgroundColor: colors.secondary }]}
+              style={[
+                styles.newBadge,
+                { backgroundColor: colors.secondary, left: rating > 0 ? BADGE_LEFT_OFFSET + RATING_BADGE_WIDTH : BADGE_LEFT_OFFSET },
+              ]}
             >
               <Typography
                 variant="caption"
@@ -235,22 +241,28 @@ const AnimeCard = React.memo(function AnimeCard({
           {(episodeCount || releaseYear) && (
             <View style={styles.infoContainer}>
               {episodeCount && (
-                <View style={styles.infoItem}>
-                  <Clock
-                    size={12}
+                <View style={styles.infoContainer}>
+                  <Clock size={14} color={colors.textSecondary} />
+                  <Typography
+                    variant="caption"
                     color={colors.textSecondary}
-                    style={styles.infoIcon}
-                  />
-                  <Typography variant="caption" color={colors.textSecondary}>
-                    {episodeCount} ep
+                    style={styles.infoText}
+                  >
+                    {episodeCount} episodes
                   </Typography>
                 </View>
               )}
-
               {releaseYear && (
-                <Typography variant="caption" color={colors.textSecondary}>
-                  {releaseYear}
-                </Typography>
+                <View style={styles.infoContainer}>
+                  <Calendar size={14} color={colors.textSecondary} />
+                  <Typography
+                    variant="caption"
+                    color={colors.textSecondary}
+                    style={styles.infoText}
+                  >
+                    {releaseYear}
+                  </Typography>
+                </View>
               )}
             </View>
           )}
@@ -268,10 +280,30 @@ const styles = StyleSheet.create({
     backgroundColor: "transparent",
   },
   imageContainer: {
-    position: "relative",
+    width: "100%",
+    aspectRatio: 2/3,
   },
   image: {
-    borderRadius: 8,
+    width: "100%",
+    height: "100%",
+    backgroundColor: "#111827",
+  },
+  titleContainer: {
+    padding: 12,
+  },
+  title: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#FFFFFF",
+    marginBottom: 4,
+  },
+  subtitle: {
+    fontSize: 12,
+    color: "#9CA3AF",
+  },
+  skeletonText: {
+    height: 16,
+    borderRadius: 4,
   },
   ratingBadge: {
     position: "absolute",
@@ -279,14 +311,13 @@ const styles = StyleSheet.create({
     left: 8,
     flexDirection: "row",
     alignItems: "center",
-    borderRadius: 20,
     paddingHorizontal: 8,
     paddingVertical: 4,
+    borderRadius: 20,
   },
   newBadge: {
     position: "absolute",
     top: 8,
-    left: rating > 0 ? 70 : 8,
     borderRadius: 20,
     paddingHorizontal: 8,
     paddingVertical: 4,
@@ -299,37 +330,24 @@ const styles = StyleSheet.create({
     marginRight: 4,
   },
   ratingText: {
-    fontWeight: "500",
+    fontSize: 10,
+  },
+  infoContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 4,
+  },
+  infoText: {
+    fontSize: 12,
+    color: "#9CA3AF",
   },
   favoriteButton: {
     position: "absolute",
     top: 8,
     right: 8,
-    backgroundColor: "rgba(0,0,0,0.7)",
+    backgroundColor: "#111827",
     borderRadius: 20,
-    padding: 6,
-  },
-  titleContainer: {
-    marginTop: 8,
-    paddingHorizontal: 4,
-  },
-  infoContainer: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginTop: 4,
-  },
-  infoItem: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  infoIcon: {
-    marginRight: 4,
-  },
-  skeletonText: {
-    height: 14,
-    borderRadius: 4,
-    marginVertical: 2,
+    padding: 8,
   },
 });
 

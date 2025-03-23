@@ -17,12 +17,17 @@ import type { Database } from "@/lib/database.types";
 
 type UUID = string;
 type Tables = Database["public"]["Tables"];
-type Anime = Tables["anime"]["Row"] & {
+
+interface Anime {
+  id: string;
+  title: string;
+  image_url: string;
+  rating?: number;
   is_favorite?: boolean;
   episode_count?: number;
   release_year?: number;
   is_new?: boolean;
-};
+}
 
 interface AnimeGridProps {
   data: Anime[];
@@ -80,7 +85,7 @@ const AnimeGrid = React.memo(function AnimeGrid({
           id={item.id}
           title={item.title}
           imageUrl={item.image_url}
-          rating={item.rating ?? undefined}
+          rating={item.rating ?? 0}
           isFavorite={item.is_favorite}
           episodeCount={item.episode_count}
           releaseYear={item.release_year}
