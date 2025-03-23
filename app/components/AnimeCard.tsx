@@ -76,15 +76,14 @@ const AnimeCard = React.memo(function AnimeCard({
     }).start();
   };
 
-  // Handle card press - navigate to anime details or watch screen
+  // Handle card press - navigate to anime details screen
   const handleCardPress = () => {
     if (onPress) {
       onPress();
     } else if (id) {
-      // Navigate to watch screen with this anime
+      // Navigate to anime details screen
       router.push({
-        pathname: "/watch",
-        params: { animeId: id, episodeId: "1" },
+        pathname: `/anime/${id}`,
       });
     }
   };

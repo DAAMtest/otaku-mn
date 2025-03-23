@@ -168,51 +168,8 @@ export default function AnimeDetailsScreen() {
               progress: 0,
             }));
           } else {
-            // If no episodes found in database, use mock data
-            formattedAnime.episodes = [
-              {
-                id: "1",
-                title: "Episode 1: The Beginning",
-                description:
-                  "The journey begins as our hero discovers their hidden powers.",
-                thumbnailUri:
-                  "https://images.unsplash.com/photo-1578632767115-351597cf2477?w=800&q=80",
-                videoUri:
-                  "https://d23dyxeqlo5psv.cloudfront.net/big_buck_bunny.mp4",
-                duration: "24:15",
-                episodeNumber: 1,
-                watched: false,
-                progress: 0,
-              },
-              {
-                id: "2",
-                title: "Episode 2: The Challenge",
-                description:
-                  "Our hero faces their first major challenge and meets new allies.",
-                thumbnailUri:
-                  "https://images.unsplash.com/photo-1560972550-aba3456b5564?w=800&q=80",
-                videoUri:
-                  "https://d23dyxeqlo5psv.cloudfront.net/big_buck_bunny.mp4",
-                duration: "23:42",
-                episodeNumber: 2,
-                watched: false,
-                progress: 0,
-              },
-              {
-                id: "3",
-                title: "Episode 3: The Revelation",
-                description:
-                  "A shocking revelation changes everything for our hero.",
-                thumbnailUri:
-                  "https://images.unsplash.com/photo-1518893494013-481c1d8ed3fd?w=800&q=80",
-                videoUri:
-                  "https://d23dyxeqlo5psv.cloudfront.net/big_buck_bunny.mp4",
-                duration: "25:10",
-                episodeNumber: 3,
-                watched: false,
-                progress: 0,
-              },
-            ];
+            // If no episodes found in database, show empty state
+            formattedAnime.episodes = [];
           }
 
           // Fetch related anime
@@ -235,23 +192,8 @@ export default function AnimeDetailsScreen() {
               relation: relation.relation_type,
             }));
           } else {
-            // Mock related anime if none found
-            formattedAnime.relatedAnime = [
-              {
-                id: "mock-related-1",
-                title: "Related Anime 1",
-                imageUrl:
-                  "https://images.unsplash.com/photo-1541562232579-512a21360020?w=800&q=80",
-                relation: "sequel",
-              },
-              {
-                id: "mock-related-2",
-                title: "Related Anime 2",
-                imageUrl:
-                  "https://images.unsplash.com/photo-1560972550-aba3456b5564?w=800&q=80",
-                relation: "prequel",
-              },
-            ];
+            // If no related anime found, show empty state
+            formattedAnime.relatedAnime = [];
           }
 
           setAnimeDetails(formattedAnime);
