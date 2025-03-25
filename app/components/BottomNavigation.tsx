@@ -1,4 +1,4 @@
-import React, { useCallback, useRef, useEffect } from "react";
+import React, { useCallback, useRef, useEffect, useState } from "react";
 import {
   View,
   Text,
@@ -10,7 +10,7 @@ import {
   SafeAreaView,
 } from "react-native";
 import { useRouter, usePathname } from "expo-router";
-import { Home, Heart, User, Search } from "lucide-react-native";
+import { Home, Heart, User, Search, Bell } from "lucide-react-native";
 import { useTheme } from "@/context/ThemeProvider";
 
 interface NavItem {
@@ -23,14 +23,17 @@ interface NavItem {
 const navItems: NavItem[] = [
   { name: "Home", href: "/", icon: Home },
   { name: "Search", href: "/search", icon: Search },
+  { name: "Notifications", href: "/notifications", icon: Bell },
   { name: "Favorites", href: "/favorites", icon: Heart },
   { name: "Profile", href: "/profile", icon: User },
+  // Library removed as it's now handled in profile screen
 ];
 
 interface BottomNavigationProps {
   currentRoute?: string;
   activeTab?: string;
   onTabChange?: (tab: string) => void;
+  notificationCount?: number;
 }
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
@@ -45,10 +48,20 @@ const BottomNavigation = React.memo(function BottomNavigation({
   currentRoute,
   activeTab,
   onTabChange,
+  notificationCount = 0,
 }: BottomNavigationProps = {}) {
   const router = useRouter();
   const pathname = usePathname();
   const { colors, isDarkMode } = useTheme();
+
+  // Local state for notification count (in a real app, this would come from a global state or context)
+  const [unreadNotifications, setUnreadNotifications] =
+    useState(notificationCount);
+
+  // Update local state when prop changes
+  useEffect(() => {
+    setUnreadNotifications(notificationCount);
+  }, [notificationCount]);
 
   // Use provided currentRoute or determine from pathname
   const activeRoute = currentRoute || pathname;
@@ -167,6 +180,21 @@ const BottomNavigation = React.memo(function BottomNavigation({
                         color={isActive ? colors.primary : colors.inactive}
                         strokeWidth={isActive ? 2.5 : 2}
                       />
+                      {item.name === "Notifications" &&
+                        unreadNotifications > 0 && (
+                          <View
+                            style={[
+                              styles.badge,
+                              { backgroundColor: colors.error },
+                            ]}
+                          >
+                            <Text style={styles.badgeText}>
+                              {unreadNotifications > 9
+                                ? "9+"
+                                : unreadNotifications}
+                            </Text>
+                          </View>
+                        )}
                     </View>
                     <Text
                       style={[
@@ -259,6 +287,22 @@ const styles = StyleSheet.create({
     width: "30%",
     borderTopLeftRadius: 3,
     borderTopRightRadius: 3,
+  },
+  badge: {
+    position: "absolute",
+    top: -2,
+    right: -2,
+    minWidth: 16,
+    height: 16,
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 4,
+  },
+  badgeText: {
+    color: "white",
+    fontSize: 10,
+    fontWeight: "bold",
   },
 });
 

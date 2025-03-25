@@ -51,6 +51,9 @@ const FilterBar = React.memo(function FilterBar({
     }).start();
   }, []);
 
+  // Sort filters alphabetically
+  const sortedFilters = [...filters].sort((a, b) => a.localeCompare(b));
+
   // Create loading placeholders data
   const loadingPlaceholders = isLoading
     ? Array(5)
@@ -83,8 +86,8 @@ const FilterBar = React.memo(function FilterBar({
               backgroundColor: isSelected
                 ? colors.primary
                 : isDarkMode
-                  ? "rgba(31, 41, 55, 0.8)"
-                  : "rgba(243, 244, 246, 0.8)",
+                  ? "rgba(45, 55, 72, 0.8)"
+                  : "rgba(237, 242, 247, 0.8)",
               borderColor: isSelected ? colors.primary : colors.border,
             },
           ]}
@@ -175,7 +178,7 @@ const FilterBar = React.memo(function FilterBar({
       ) : (
         <FlatList
           horizontal
-          data={filters}
+          data={sortedFilters}
           renderItem={renderFilterItem}
           keyExtractor={(item, index) => `filter-${index}-${item}`}
           contentContainerStyle={styles.scrollContent}

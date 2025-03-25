@@ -1,8 +1,10 @@
 import { useState, useEffect } from "react";
 import { supabase } from "../lib/supabase";
+import type { Database } from "@lib/database.types";
+import { UUID } from "./useAnimeSearch";
 
 export interface AnimeListItem {
-  id: string;
+  id: UUID;
   title: string;
   imageUrl: string;
   rating: number;
@@ -113,7 +115,7 @@ export function useAnimeLists(userId: string | null) {
 
   // Add anime to a list
   const addToList = async (
-    animeId: string,
+    animeId: UUID,
     listType: ListType,
     progress: number = 0,
   ) => {
@@ -183,7 +185,7 @@ export function useAnimeLists(userId: string | null) {
   };
 
   // Remove anime from a list
-  const removeFromList = async (animeId: string, listType: ListType) => {
+  const removeFromList = async (animeId: UUID, listType: ListType) => {
     if (!userId) return { error: new Error("User not authenticated") };
 
     try {
@@ -218,7 +220,7 @@ export function useAnimeLists(userId: string | null) {
   };
 
   // Update progress for a watching anime
-  const updateProgress = async (animeId: string, progress: number) => {
+  const updateProgress = async (animeId: UUID, progress: number) => {
     if (!userId) return { error: new Error("User not authenticated") };
 
     try {
@@ -245,7 +247,7 @@ export function useAnimeLists(userId: string | null) {
 
   // Move anime from one list to another
   const moveToList = async (
-    animeId: string,
+    animeId: UUID,
     fromList: ListType,
     toList: ListType,
     progress: number = 0,

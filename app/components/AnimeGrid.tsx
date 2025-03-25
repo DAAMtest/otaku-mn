@@ -15,24 +15,23 @@ import { useTheme } from "@/context/ThemeProvider";
 import { router } from "expo-router";
 import type { Database } from "@/lib/database.types";
 
-type UUID = string;
-type Tables = Database["public"]["Tables"];
-type Anime = Tables["anime"]["Row"] & {
-  is_favorite?: boolean;
+import { Anime, UUID } from "@/hooks/useAnimeSearch";
+
+interface AnimeGridItem extends Anime {
   episode_count?: number;
   release_year?: number;
   is_new?: boolean;
-};
+}
 
 interface AnimeGridProps {
-  data: Anime[];
+  data: AnimeGridItem[];
   loading?: boolean;
   refreshing?: boolean;
   onRefresh?: () => void;
   onEndReached?: () => void;
-  onAnimePress?: (anime: Anime) => void;
-  onAddToList?: (anime: Anime) => void;
-  onFavorite?: (anime: Anime) => void;
+  onAnimePress?: (anime: AnimeGridItem) => void;
+  onAddToList?: (anime: AnimeGridItem) => void;
+  onFavorite?: (anime: AnimeGridItem) => void;
   ListEmptyComponent?: React.ReactElement;
   ListHeaderComponent?: React.ReactElement;
   numColumns?: number;
@@ -62,7 +61,7 @@ const AnimeGrid = React.memo(function AnimeGrid({
   const screenWidth = Dimensions.get("window").width;
   const cardWidth = (screenWidth - 32) / numColumns; // 32 = padding (16) * 2
 
-  const renderItem: ListRenderItem<Anime> = ({ item }) => {
+  const renderItem: ListRenderItem<AnimeGridItem> = ({ item }) => {
     const handlePress = () => {
       if (onAnimePress) {
         onAnimePress(item);
@@ -92,7 +91,7 @@ const AnimeGrid = React.memo(function AnimeGrid({
     );
   };
 
-  const keyExtractor = (item: Anime) => item.id.toString();
+  const keyExtractor = (item: AnimeGridItem) => item.id.toString();
 
   // Custom empty component that doesn't show "End of List"
   const renderEmpty = () => {

@@ -16,11 +16,11 @@ import Typography from "./Typography";
 
 const CONTINUE_WATCHING_KEY = "CONTINUE_WATCHING";
 
-type UUID = string;
+import { UUID } from "@/hooks/useAnimeSearch";
 
 interface WatchHistoryItem {
   animeId: UUID;
-  episodeId: string;
+  episodeId: UUID;
   title: string;
   episodeInfo: string;
   thumbnailUri?: string;

@@ -27,8 +27,9 @@ import {
   Heart,
   Play,
 } from "lucide-react-native";
-import { supabase } from "../lib/supabase";
-import { useAuth } from "../context/AuthContext";
+import { supabase } from "@/lib/supabase";
+import { useAuth } from "@/context/AuthContext";
+import useNotifications from "@/hooks/useNotifications";
 
 interface Notification {
   id: string;
@@ -42,7 +43,9 @@ interface Notification {
 
 export default function NotificationManagement() {
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, session } = useAuth();
+  const { notifications: userNotifications, fetchNotifications } =
+    useNotifications(user?.id || null);
   const [notificationList, setNotificationList] = useState<Notification[]>([]);
   const [filteredNotificationList, setFilteredNotificationList] = useState<
     Notification[]
@@ -87,10 +90,14 @@ export default function NotificationManagement() {
     { id: "admins", name: "Admins Only" },
   ];
 
-  // Fetch notification list on component mount
+  // Check authentication and fetch notification list on component mount
   useEffect(() => {
+    if (!session) {
+      router.replace("/");
+      return;
+    }
     fetchNotificationList();
-  }, []);
+  }, [session, router]);
 
   // Filter notification list when search query changes
   useEffect(() => {

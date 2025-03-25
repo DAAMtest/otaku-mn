@@ -1,7 +1,9 @@
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "../lib/supabase";
 
-type UUID = string;
+import type { Database } from "@lib/database.types";
+
+export type UUID = string;
 
 export interface Anime {
   id: UUID;

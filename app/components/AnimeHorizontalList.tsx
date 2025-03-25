@@ -14,22 +14,21 @@ import { useTheme } from "@/context/ThemeProvider";
 import { router } from "expo-router";
 import type { Database } from "@/lib/database.types";
 
-type UUID = string;
-type Tables = Database["public"]["Tables"];
-type Anime = Tables["anime"]["Row"] & {
-  is_favorite?: boolean;
+import { Anime, UUID } from "@/hooks/useAnimeSearch";
+
+interface AnimeListItem extends Anime {
   episode_count?: number;
   release_year?: number;
   is_new?: boolean;
-};
+}
 
 interface AnimeHorizontalListProps {
   title: string;
-  data: Anime[];
+  data: AnimeListItem[];
   loading?: boolean;
   onSeeAllPress?: () => void;
-  onAnimePress?: (anime: Anime) => void;
-  onFavorite?: (anime: Anime) => void;
+  onAnimePress?: (anime: AnimeListItem) => void;
+  onFavorite?: (anime: AnimeListItem) => void;
 }
 
 /**
@@ -46,7 +45,7 @@ const AnimeHorizontalList = React.memo(function AnimeHorizontalList({
 }: AnimeHorizontalListProps) {
   const { colors } = useTheme();
 
-  const renderItem: ListRenderItem<Anime> = ({ item }) => {
+  const renderItem: ListRenderItem<AnimeListItem> = ({ item }) => {
     const handlePress = () => {
       if (onAnimePress) {
         onAnimePress(item);

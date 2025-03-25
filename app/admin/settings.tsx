@@ -25,7 +25,9 @@ import {
   Trash2,
   FileJson,
 } from "lucide-react-native";
-import { supabase } from "../lib/supabase";
+import { supabase } from "@/lib/supabase";
+import { useAuth } from "@/context/AuthContext";
+import useUserPreferences from "@/hooks/useUserPreferences";
 
 interface AppSettings {
   maintenance_mode: boolean;
@@ -42,6 +44,10 @@ interface AppSettings {
 
 export default function AdminSettings() {
   const router = useRouter();
+  const { user, session } = useAuth();
+  const { preferences, updatePreferences } = useUserPreferences(
+    user?.id || null,
+  );
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [settings, setSettings] = useState<AppSettings>({
@@ -57,14 +63,18 @@ export default function AdminSettings() {
     app_version: "1.0.0",
   });
 
-  // Fetch settings on component mount
+  // Check authentication and fetch settings on component mount
   useEffect(() => {
+    if (!session) {
+      router.replace("/");
+      return;
+    }
     // In a real app, you would fetch settings from the database
     // For this demo, we'll just simulate loading
     setTimeout(() => {
       setLoading(false);
     }, 1000);
-  }, []);
+  }, [session, router]);
 
   // Handle back button press
   const handleBackPress = () => {
@@ -113,7 +123,7 @@ export default function AdminSettings() {
           },
           style: "destructive",
         },
-      ]
+      ],
     );
   };
 
@@ -122,7 +132,7 @@ export default function AdminSettings() {
     Alert.alert(
       "Export Settings",
       "Settings would be exported as JSON in a real app.",
-      [{ text: "OK" }]
+      [{ text: "OK" }],
     );
   };
 
@@ -131,7 +141,7 @@ export default function AdminSettings() {
     Alert.alert(
       "Import Settings",
       "Settings would be imported from JSON in a real app.",
-      [{ text: "OK" }]
+      [{ text: "OK" }],
     );
   };
 
@@ -140,7 +150,7 @@ export default function AdminSettings() {
     Alert.alert(
       "Database Backup",
       "This would trigger a database backup in a real app.",
-      [{ text: "OK" }]
+      [{ text: "OK" }],
     );
   };
 
@@ -149,7 +159,7 @@ export default function AdminSettings() {
     Alert.alert(
       "Clear Cache",
       "This would clear the application cache in a real app.",
-      [{ text: "OK" }]
+      [{ text: "OK" }],
     );
   };
 
@@ -218,7 +228,9 @@ export default function AdminSettings() {
                     setSettings({ ...settings, allow_new_registrations: value })
                   }
                   trackColor={{ false: "#3f3f46", true: "#2563eb" }}
-                  thumbColor={settings.allow_new_registrations ? "#ffffff" : "#d4d4d8"}
+                  thumbColor={
+                    settings.allow_new_registrations ? "#ffffff" : "#d4d4d8"
+                  }
                 />
               </View>
 
@@ -236,7 +248,10 @@ export default function AdminSettings() {
                   <TouchableOpacity
                     className={`flex-1 p-2 ${settings.default_user_role === "moderator" ? "bg-blue-600" : "bg-gray-700"}`}
                     onPress={() =>
-                      setSettings({ ...settings, default_user_role: "moderator" })
+                      setSettings({
+                        ...settings,
+                        default_user_role: "moderator",
+                      })
                     }
                   >
                     <Text className="text-white text-center">Moderator</Text>
@@ -265,7 +280,7 @@ export default function AdminSettings() {
                           setSettings({ ...settings, theme_color: color })
                         }
                       />
-                    )
+                    ),
                   )}
                 </View>
               </View>
@@ -291,7 +306,9 @@ export default function AdminSettings() {
 
             <View className="bg-gray-800 rounded-lg p-4 mb-4">
               <View className="mb-4">
-                <Text className="text-gray-300 mb-1">Notification Frequency</Text>
+                <Text className="text-gray-300 mb-1">
+                  Notification Frequency
+                </Text>
                 <View className="flex-row">
                   <TouchableOpacity
                     className={`flex-1 p-2 rounded-l-lg ${settings.notification_frequency === "realtime" ? "bg-purple-600" : "bg-gray-700"}`}
@@ -351,7 +368,9 @@ export default function AdminSettings() {
                     setSettings({ ...settings, content_moderation: value })
                   }
                   trackColor={{ false: "#3f3f46", true: "#7c3aed" }}
-                  thumbColor={settings.content_moderation ? "#ffffff" : "#d4d4d8"}
+                  thumbColor={
+                    settings.content_moderation ? "#ffffff" : "#d4d4d8"
+                  }
                 />
               </View>
             </View>
@@ -364,7 +383,9 @@ export default function AdminSettings() {
               className="bg-red-500 p-4 rounded-lg flex-row items-center justify-center"
             >
               <RefreshCw size={20} color="#FFFFFF" className="mr-2" />
-              <Text className="text-white font-semibold">Reset to Defaults</Text>
+              <Text className="text-white font-semibold">
+                Reset to Defaults
+              </Text>
             </TouchableOpacity>
             <TouchableOpacity
               onPress={handleExportSettings}

@@ -25,25 +25,33 @@ import {
   Heart,
   TrendingUp,
 } from "lucide-react-native";
-import { useAuth } from "../context/AuthContext";
-import AdminNavigation from "../components/AdminNavigation";
+import { useAuth } from "@/context/AuthContext";
+import AdminNavigation from "@/components/AdminNavigation";
+import useAnimeData from "@/hooks/useAnimeData";
+import useAnimeLists from "@/hooks/useAnimeLists";
+import { supabase } from "@/lib/supabase";
 
 export default function AdminDashboard() {
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, session } = useAuth();
+  const { trendingAnime, newReleases } = useAnimeData();
   const [activeSection, setActiveSection] = useState("overview");
   const [loading, setLoading] = useState(true);
   const [showSidebar, setShowSidebar] = useState(false);
   const { width } = Dimensions.get("window");
   const isTablet = width > 768;
 
-  // Fetch dashboard data
+  // Check authentication and fetch dashboard data
   useEffect(() => {
+    if (!session) {
+      router.replace("/");
+      return;
+    }
     // Simulate API call
     setTimeout(() => {
       setLoading(false);
     }, 1000);
-  }, []);
+  }, [session, router]);
 
   // Handle back button press
   const handleBackPress = () => {

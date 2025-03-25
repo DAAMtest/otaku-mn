@@ -22,12 +22,13 @@ import {
   Tag,
   Film,
 } from "lucide-react-native";
-import { supabase } from '@lib/supabase';
-import { useAuth } from '@context/AuthContext';
-import type { Database } from '@lib/database.types';
+import { supabase } from "@/lib/supabase";
+import { useAuth } from "@/context/AuthContext";
+import type { Database } from "@/lib/database.types";
+import useAnimeData from "@/hooks/useAnimeData";
 
-type Tables = Database['public']['Tables'];
-type Genre = Tables['genres']['Row'] & {
+type Tables = Database["public"]["Tables"];
+type Genre = Tables["genres"]["Row"] & {
   anime_count?: number;
 };
 
@@ -43,17 +44,18 @@ interface CountResult {
 export default function GenreManagement() {
   const router = useRouter();
   const { session } = useAuth();
+  const { genres: allGenres, fetchGenres: fetchAllGenres } = useAnimeData();
   const [genres, setGenres] = useState<Genre[]>([]);
   const [loading, setLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchQuery, setSearchQuery] = useState("");
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [editingGenre, setEditingGenre] = useState<Genre | null>(null);
-  const [genreName, setGenreName] = useState('');
-  const [description, setDescription] = useState('');
+  const [genreName, setGenreName] = useState("");
+  const [description, setDescription] = useState("");
 
   useEffect(() => {
     if (!session) {
-      router.replace('/');
+      router.replace("/");
       return;
     }
     fetchGenres();
@@ -63,29 +65,30 @@ export default function GenreManagement() {
     try {
       setLoading(true);
       const { data: genres, error: genresError } = await supabase
-        .from('genres')
-        .select('*')
-        .order('name');
-      
+        .from("genres")
+        .select("*")
+        .order("name");
+
       if (genresError) throw genresError;
 
       // Fetch anime counts for each genre
-      const { data: counts, error: countsError } = await supabase
-        .rpc('get_genre_anime_counts');
+      const { data: counts, error: countsError } = await supabase.rpc(
+        "get_genre_anime_counts",
+      );
 
       if (countsError) throw countsError;
 
       const genresWithCounts = genres.map((genre: Genre) => ({
         ...genre,
-        anime_count: (counts as CountResult[]).find(
-          count => count.genre_id === genre.id
-        )?.count || 0,
+        anime_count:
+          (counts as CountResult[]).find((count) => count.genre_id === genre.id)
+            ?.count || 0,
       }));
 
       setGenres(genresWithCounts);
     } catch (error) {
-      console.error('Error fetching genres:', error);
-      Alert.alert('Error', 'Failed to fetch genres');
+      console.error("Error fetching genres:", error);
+      Alert.alert("Error", "Failed to fetch genres");
     } finally {
       setLoading(false);
     }
@@ -94,17 +97,19 @@ export default function GenreManagement() {
   const handleAddGenre = async () => {
     try {
       if (!genreName.trim()) {
-        Alert.alert('Error', 'Genre name is required');
+        Alert.alert("Error", "Genre name is required");
         return;
       }
 
       const { data, error } = await supabase
-        .from('genres')
-        .insert([{ 
-          name: genreName.trim(), 
-          description: description.trim() || null,
-          updated_at: new Date().toISOString(),
-        }])
+        .from("genres")
+        .insert([
+          {
+            name: genreName.trim(),
+            description: description.trim() || null,
+            updated_at: new Date().toISOString(),
+          },
+        ])
         .select()
         .single();
 
@@ -112,49 +117,51 @@ export default function GenreManagement() {
 
       setGenres([...genres, { ...data, anime_count: 0 }]);
       setIsModalVisible(false);
-      setGenreName('');
-      setDescription('');
+      setGenreName("");
+      setDescription("");
     } catch (error) {
-      console.error('Error adding genre:', error);
-      Alert.alert('Error', 'Failed to add genre');
+      console.error("Error adding genre:", error);
+      Alert.alert("Error", "Failed to add genre");
     }
   };
 
   const handleEditGenre = async () => {
     try {
       if (!editingGenre || !genreName.trim()) {
-        Alert.alert('Error', 'Genre name is required');
+        Alert.alert("Error", "Genre name is required");
         return;
       }
 
       const { error } = await supabase
-        .from('genres')
-        .update({ 
-          name: genreName.trim(), 
+        .from("genres")
+        .update({
+          name: genreName.trim(),
           description: description.trim() || null,
           updated_at: new Date().toISOString(),
         })
-        .eq('id', editingGenre.id);
+        .eq("id", editingGenre.id);
 
       if (error) throw error;
 
-      setGenres(genres.map(genre => 
-        genre.id === editingGenre.id
-          ? { 
-              ...genre, 
-              name: genreName.trim(), 
-              description: description.trim() || null,
-              updated_at: new Date().toISOString(),
-            }
-          : genre
-      ));
+      setGenres(
+        genres.map((genre) =>
+          genre.id === editingGenre.id
+            ? {
+                ...genre,
+                name: genreName.trim(),
+                description: description.trim() || null,
+                updated_at: new Date().toISOString(),
+              }
+            : genre,
+        ),
+      );
       setIsModalVisible(false);
       setEditingGenre(null);
-      setGenreName('');
-      setDescription('');
+      setGenreName("");
+      setDescription("");
     } catch (error) {
-      console.error('Error updating genre:', error);
-      Alert.alert('Error', 'Failed to update genre');
+      console.error("Error updating genre:", error);
+      Alert.alert("Error", "Failed to update genre");
     }
   };
 
@@ -162,29 +169,30 @@ export default function GenreManagement() {
     try {
       if (genre.anime_count && genre.anime_count > 0) {
         Alert.alert(
-          'Cannot Delete',
-          `This genre is associated with ${genre.anime_count} anime. Please remove these associations first.`
+          "Cannot Delete",
+          `This genre is associated with ${genre.anime_count} anime. Please remove these associations first.`,
         );
         return;
       }
 
       const { error } = await supabase
-        .from('genres')
+        .from("genres")
         .delete()
-        .eq('id', genre.id);
+        .eq("id", genre.id);
 
       if (error) throw error;
 
-      setGenres(genres.filter(g => g.id !== genre.id));
+      setGenres(genres.filter((g) => g.id !== genre.id));
     } catch (error) {
-      console.error('Error deleting genre:', error);
-      Alert.alert('Error', 'Failed to delete genre');
+      console.error("Error deleting genre:", error);
+      Alert.alert("Error", "Failed to delete genre");
     }
   };
 
-  const filteredGenres = genres.filter(genre =>
-    genre.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    genre.description?.toLowerCase().includes(searchQuery.toLowerCase())
+  const filteredGenres = genres.filter(
+    (genre) =>
+      genre.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      genre.description?.toLowerCase().includes(searchQuery.toLowerCase()),
   );
 
   const renderItem = ({ item: genre }: { item: Genre }) => (
@@ -204,7 +212,7 @@ export default function GenreManagement() {
           onPress={() => {
             setEditingGenre(genre);
             setGenreName(genre.name);
-            setDescription(genre.description || '');
+            setDescription(genre.description || "");
             setIsModalVisible(true);
           }}
           className="p-2"
@@ -214,12 +222,16 @@ export default function GenreManagement() {
         <TouchableOpacity
           onPress={() => {
             Alert.alert(
-              'Delete Genre',
+              "Delete Genre",
               `Are you sure you want to delete "${genre.name}"?`,
               [
-                { text: 'Cancel', style: 'cancel' },
-                { text: 'Delete', onPress: () => handleDeleteGenre(genre), style: 'destructive' }
-              ]
+                { text: "Cancel", style: "cancel" },
+                {
+                  text: "Delete",
+                  onPress: () => handleDeleteGenre(genre),
+                  style: "destructive",
+                },
+              ],
             );
           }}
           className="p-2"
@@ -254,8 +266,8 @@ export default function GenreManagement() {
         <TouchableOpacity
           onPress={() => {
             setEditingGenre(null);
-            setGenreName('');
-            setDescription('');
+            setGenreName("");
+            setDescription("");
             setIsModalVisible(true);
           }}
           className="bg-indigo-600 p-2 rounded-lg"
@@ -272,15 +284,15 @@ export default function GenreManagement() {
         <FlatList
           data={filteredGenres}
           renderItem={renderItem}
-          keyExtractor={genre => genre.id}
+          keyExtractor={(genre) => genre.id}
           contentContainerClassName="p-4"
           ListEmptyComponent={
             <View className="items-center justify-center py-8">
               <Tag size={48} color="#4B5563" />
               <Text className="text-gray-400 text-lg mt-4">
                 {searchQuery
-                  ? 'No genres found matching your search'
-                  : 'No genres added yet'}
+                  ? "No genres found matching your search"
+                  : "No genres added yet"}
               </Text>
             </View>
           }
@@ -297,7 +309,7 @@ export default function GenreManagement() {
           <View className="bg-gray-800 w-full max-w-sm rounded-lg p-6">
             <View className="flex-row justify-between items-center mb-4">
               <Text className="text-white text-xl font-semibold">
-                {editingGenre ? 'Edit Genre' : 'Add Genre'}
+                {editingGenre ? "Edit Genre" : "Add Genre"}
               </Text>
               <TouchableOpacity
                 onPress={() => setIsModalVisible(false)}
@@ -330,7 +342,7 @@ export default function GenreManagement() {
               className="bg-indigo-600 py-3 rounded-lg"
             >
               <Text className="text-white text-center font-semibold">
-                {editingGenre ? 'Save Changes' : 'Add Genre'}
+                {editingGenre ? "Save Changes" : "Add Genre"}
               </Text>
             </TouchableOpacity>
           </View>

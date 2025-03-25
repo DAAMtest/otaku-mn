@@ -24,8 +24,8 @@ import {
   Trash2,
   UserCog,
 } from "lucide-react-native";
-import { supabase } from "../lib/supabase";
-import { useAuth } from "../context/AuthContext";
+import { supabase } from "@/lib/supabase";
+import { useAuth } from "@/context/AuthContext";
 
 interface UserProfile {
   id: string;
@@ -39,16 +39,20 @@ interface UserProfile {
 
 export default function UserManagement() {
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, session } = useAuth();
   const [userList, setUserList] = useState<UserProfile[]>([]);
   const [filteredUserList, setFilteredUserList] = useState<UserProfile[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [loading, setLoading] = useState(true);
 
-  // Fetch user list on component mount
+  // Check authentication and fetch user list on component mount
   useEffect(() => {
+    if (!session) {
+      router.replace("/");
+      return;
+    }
     fetchUserList();
-  }, []);
+  }, [session, router]);
 
   // Filter user list when search query changes
   useEffect(() => {
