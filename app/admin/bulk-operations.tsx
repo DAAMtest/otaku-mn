@@ -541,4 +541,45 @@ export default function BulkOperations() {
                   <Text className="text-white text-center">JSON</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                  className={`flex-1 py-2 ${exportFormat ===
+                  className={`flex-1 py-2 ${exportFormat === "csv" ? "bg-indigo-600" : "bg-gray-800"}`}
+                  onPress={() => setExportFormat("csv")}
+                >
+                  <Text className="text-white text-center">CSV</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  className={`flex-1 py-2 rounded-r-lg ${exportFormat === "xml" ? "bg-indigo-600" : "bg-gray-800"}`}
+                  onPress={() => setExportFormat("xml")}
+                >
+                  <Text className="text-white text-center">XML</Text>
+                </TouchableOpacity>
+              </View>
+
+              <TouchableOpacity
+                className="flex-row items-center bg-gray-800 rounded-lg p-4 mb-3"
+                onPress={handleExport}
+              >
+                <Download size={24} color="#34D399" />
+                <Text className="text-white ml-3">Export {getSelectedCount()} Selected Items</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                className="flex-row items-center bg-gray-800 rounded-lg p-4 mb-6"
+                onPress={handleImport}
+              >
+                <Upload size={24} color="#60A5FA" />
+                <Text className="text-white ml-3">Import Data</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                className="bg-gray-800 rounded-lg py-3 items-center"
+                onPress={() => setImportExportModalVisible(false)}
+              >
+                <Text className="text-white">Cancel</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
+      </View>
+    </SafeAreaView>
+  );
+}
