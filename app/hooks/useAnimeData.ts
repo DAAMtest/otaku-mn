@@ -1,8 +1,7 @@
 import { useState, useEffect } from "react";
 import { supabase } from "../lib/supabase";
 import { Anime, UUID } from "./useAnimeSearch";
-
-type UUID = string;
+import type { Database } from "@lib/database.types";
 
 export function useAnimeData() {
   const [genres, setGenres] = useState<string[]>([]);

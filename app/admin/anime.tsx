@@ -27,8 +27,9 @@ import {
   FileText,
   Image as ImageIcon,
 } from "lucide-react-native";
-import { supabase } from "../lib/supabase";
-import { useAuth } from "../context/AuthContext";
+import { supabase } from "@/lib/supabase";
+import { useAuth } from "@/context/AuthContext";
+import useAnimeData from "@/hooks/useAnimeData";
 
 type UUID = string;
 
@@ -44,7 +45,7 @@ interface Anime {
 
 export default function AnimeManagement() {
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, session } = useAuth();
   const [animeList, setAnimeList] = useState<Anime[]>([]);
   const [filteredAnimeList, setFilteredAnimeList] = useState<Anime[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
@@ -62,11 +63,15 @@ export default function AnimeManagement() {
   const [genres, setGenres] = useState<{ id: string; name: string }[]>([]);
   const [selectedGenres, setSelectedGenres] = useState<string[]>([]);
 
-  // Fetch anime list on component mount
+  // Check authentication and fetch anime list on component mount
   useEffect(() => {
+    if (!session) {
+      router.replace("/");
+      return;
+    }
     fetchAnimeList();
     fetchGenres();
-  }, []);
+  }, [session, router]);
 
   // Filter anime list when search query changes
   useEffect(() => {

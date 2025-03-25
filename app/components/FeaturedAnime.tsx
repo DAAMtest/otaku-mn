@@ -6,18 +6,17 @@ import { cn } from "@/lib/utils";
 import { View, Text, TouchableOpacity } from "react-native";
 import type { Database } from "@/lib/database.types";
 
-type Tables = Database["public"]["Tables"];
-type UUID = string;
-type Anime = Tables["anime"]["Row"] & {
-  is_favorite?: boolean;
+import { Anime, UUID } from "@/hooks/useAnimeSearch";
+
+interface FeaturedAnimeItem extends Anime {
   genres?: string[];
-};
+}
 
 interface FeaturedAnimeProps {
-  anime: Anime;
-  onPress?: (anime: Anime) => void;
-  onPlayPress?: (anime: Anime) => void;
-  onAddToListPress?: (anime: Anime) => void;
+  anime: FeaturedAnimeItem;
+  onPress?: (anime: FeaturedAnimeItem) => void;
+  onPlayPress?: (anime: FeaturedAnimeItem) => void;
+  onAddToListPress?: (anime: FeaturedAnimeItem) => void;
 }
 
 interface GenreTagsProps {

@@ -26,8 +26,9 @@ import {
   Shield,
   Filter,
 } from "lucide-react-native";
-import { supabase } from "../lib/supabase";
-import { useAuth } from "../context/AuthContext";
+import { supabase } from "@/lib/supabase";
+import { useAuth } from "@/context/AuthContext";
+import useNotifications from "@/hooks/useNotifications";
 
 interface ReportedContent {
   id: string;
@@ -47,7 +48,7 @@ interface ReportedContent {
  */
 export default function ContentModeration() {
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, session } = useAuth();
   const [reports, setReports] = useState<ReportedContent[]>([]);
   const [filteredReports, setFilteredReports] = useState<ReportedContent[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
@@ -111,10 +112,14 @@ export default function ContentModeration() {
     },
   ];
 
-  // Fetch reports on component mount
+  // Check authentication and fetch reports on component mount
   useEffect(() => {
+    if (!session) {
+      router.replace("/");
+      return;
+    }
     fetchReports();
-  }, []);
+  }, [session, router]);
 
   // Filter reports when search query or filter status changes
   useEffect(() => {

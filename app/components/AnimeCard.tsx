@@ -12,8 +12,10 @@ import { useTheme } from "@/context/ThemeProvider";
 import Typography from "./Typography";
 import { router } from "expo-router";
 
+import { UUID } from "@/hooks/useAnimeSearch";
+
 interface AnimeCardProps {
-  id: string;
+  id: UUID;
   title: string;
   imageUrl: string;
   rating: number;

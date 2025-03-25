@@ -29,8 +29,8 @@ import {
   Users,
   Filter,
 } from "lucide-react-native";
-import { supabase } from "../lib/supabase";
-import { useAuth } from "../context/AuthContext";
+import { supabase } from "@/lib/supabase";
+import { useAuth } from "@/context/AuthContext";
 
 type UUID = string;
 
@@ -48,7 +48,7 @@ interface BulkItem {
  */
 export default function BulkOperations() {
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, session } = useAuth();
   const [items, setItems] = useState<BulkItem[]>([]);
   const [filteredItems, setFilteredItems] = useState<BulkItem[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
@@ -135,10 +135,14 @@ export default function BulkOperations() {
     },
   ];
 
-  // Fetch items on component mount and when selected type changes
+  // Check authentication and fetch items on component mount and when selected type changes
   useEffect(() => {
+    if (!session) {
+      router.replace('/');
+      return;
+    }
     fetchItems();
-  }, [selectedType]);
+  }, [selectedType, session, router]);
 
   // Filter items when search query changes
   useEffect(() => {

@@ -9,13 +9,8 @@ import MenuDrawer from "@/components/MenuDrawer";
 import { useAuth } from "@/context/AuthContext";
 import type { Database } from "@/lib/database.types";
 import BottomNavigation from "@/components/BottomNavigation";
-
-type Tables = Database["public"]["Tables"];
-type UUID = string;
-type Anime = Tables["anime"]["Row"] & {
-  is_favorite?: boolean;
-  genres?: string[];
-};
+import useAnimeData from "@/hooks/useAnimeData";
+import { Anime } from "@/hooks/useAnimeSearch";
 
 export default function HomeScreen() {
   const router = useRouter();
@@ -29,18 +24,27 @@ export default function HomeScreen() {
     "desc",
   );
 
-  // Define filter options
+  // Get anime data from the hook
+  const {
+    genres,
+    trendingAnime,
+    newReleases,
+    loading: animeDataLoading,
+    error: animeDataError,
+    fetchGenres,
+    fetchTrendingAnime,
+    fetchNewReleases,
+  } = useAnimeData();
+
+  // Define filter options based on fetched genres
   const filterOptions = useMemo(
-    () => [
-      { id: "action", label: "Action", value: "Action" },
-      { id: "adventure", label: "Adventure", value: "Adventure" },
-      { id: "comedy", label: "Comedy", value: "Comedy" },
-      { id: "drama", label: "Drama", value: "Drama" },
-      { id: "fantasy", label: "Fantasy", value: "Fantasy" },
-      { id: "horror", label: "Horror", value: "Horror" },
-      { id: "scifi", label: "Sci-Fi", value: "Sci-Fi" },
-    ],
-    [],
+    () =>
+      genres.map((genre) => ({
+        id: genre.toLowerCase().replace(/\s+/g, "-"),
+        label: genre,
+        value: genre,
+      })),
+    [genres],
   );
 
   // Get current route for bottom navigation
@@ -52,114 +56,8 @@ export default function HomeScreen() {
     return "/";
   }, [pathname]);
 
-  const [animeList, setAnimeList] = useState<Anime[]>([
-    {
-      id: "1",
-      title: "Attack on Titan",
-      image_url:
-        "https://images.unsplash.com/photo-1541562232579-512a21325720?w=400&q=80",
-      rating: 4.8,
-      is_favorite: true,
-      description: "Humanity's last stand against man-eating giants",
-      release_date: "2013-04-07",
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-      genres: ["Action", "Drama", "Fantasy"],
-    },
-    {
-      id: "2",
-      title: "My Hero Academia",
-      image_url:
-        "https://images.unsplash.com/photo-1560972550-aba3456b5564?w=400&q=80",
-      rating: 4.6,
-      is_favorite: false,
-      description: "A quirkless boy's journey to become the greatest hero",
-      release_date: "2016-04-03",
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-      genres: ["Action", "Comedy", "Sci-Fi"],
-    },
-    {
-      id: "3",
-      title: "Demon Slayer",
-      image_url:
-        "https://images.unsplash.com/photo-1578632767115-351597cf2477?w=400&q=80",
-      rating: 4.9,
-      is_favorite: true,
-      description: "A young demon slayer avenges his family",
-      release_date: "2019-04-06",
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-      genres: ["Action", "Fantasy", "Horror"],
-    },
-    {
-      id: "4",
-      title: "One Piece",
-      image_url:
-        "https://images.unsplash.com/photo-1607604276583-eef5d076aa5f?w=400&q=80",
-      rating: 4.7,
-      is_favorite: false,
-      description: "Pirates search for the ultimate treasure",
-      release_date: "1999-10-20",
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-      genres: ["Action", "Adventure", "Comedy"],
-    },
-    {
-      id: "5",
-      title: "Jujutsu Kaisen",
-      image_url:
-        "https://images.unsplash.com/photo-1618336753974-aae8e04506aa?w=400&q=80",
-      rating: 4.8,
-      is_favorite: false,
-      description:
-        "A high school student joins a secret organization of Jujutsu Sorcerers",
-      release_date: "2020-10-03",
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-      genres: ["Action", "Fantasy", "Horror"],
-    },
-    {
-      id: "6",
-      title: "Naruto Shippuden",
-      image_url:
-        "https://images.unsplash.com/photo-1601850494422-3cf14624b0b3?w=400&q=80",
-      rating: 4.5,
-      is_favorite: true,
-      description: "A ninja's quest to become the leader of his village",
-      release_date: "2007-02-15",
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-      genres: ["Action", "Adventure", "Fantasy"],
-    },
-    {
-      id: "7",
-      title: "Tokyo Ghoul",
-      image_url:
-        "https://images.unsplash.com/photo-1612036782180-6f0b6cd846fe?w=400&q=80",
-      rating: 4.3,
-      is_favorite: false,
-      description:
-        "A college student becomes half-ghoul after a fatal encounter",
-      release_date: "2014-07-04",
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-      genres: ["Action", "Drama", "Horror"],
-    },
-    {
-      id: "8",
-      title: "Fullmetal Alchemist: Brotherhood",
-      image_url:
-        "https://images.unsplash.com/photo-1614583225154-5fcdda07019e?w=400&q=80",
-      rating: 4.9,
-      is_favorite: true,
-      description: "Two brothers seek the philosopher's stone",
-      release_date: "2009-04-05",
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-      genres: ["Action", "Adventure", "Drama"],
-    },
-  ]);
+  // Use the trending anime as the main anime list
+  const [animeList, setAnimeList] = useState<Anime[]>([]);
 
   // Use useMemo for filtered and sorted anime list instead of state
   const filteredAnimeList = useMemo(() => {
@@ -182,8 +80,8 @@ export default function HomeScreen() {
     });
   }, [animeList, selectedGenres, currentSortOrder]);
 
-  // Simulate loading state
-  const [isLoading, setIsLoading] = useState(false);
+  // Use the loading state from the hook
+  const [isLoading, setIsLoading] = useState(true);
 
   // Handle user profile press
   const handleProfilePress = () => {
@@ -319,11 +217,14 @@ export default function HomeScreen() {
   };
 
   // Handle anime press
-  const handleAnimePress = useCallback((anime: Anime) => {
-    console.log(`Anime pressed: ${anime.id}`);
-    // Navigate to anime details
-    Alert.alert("Anime Details", `Viewing details for anime: ${anime.title}`);
-  }, []);
+  const handleAnimePress = useCallback(
+    (anime: Anime) => {
+      console.log(`Anime pressed: ${anime.id}`);
+      // Navigate to anime details page
+      router.push(`/anime/${anime.id}`);
+    },
+    [router],
+  );
 
   // Handle add to list
   const handleAddToList = useCallback(
@@ -399,10 +300,57 @@ export default function HomeScreen() {
     }
   }, [isLoading, filteredAnimeList.length]);
 
+  // Load data using the hook functions
+  const loadAllData = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      // Fetch genres first
+      await fetchGenres();
+
+      // Fetch trending anime
+      await fetchTrendingAnime();
+
+      // Fetch new releases
+      await fetchNewReleases();
+    } catch (error) {
+      console.error("Error loading anime data:", error);
+      Alert.alert(
+        "Error",
+        "Failed to load anime data. Please try again later.",
+      );
+    } finally {
+      setIsLoading(false);
+    }
+  }, [fetchGenres, fetchTrendingAnime, fetchNewReleases]);
+
+  // Update animeList when trendingAnime changes
+  useEffect(() => {
+    if (trendingAnime.length > 0) {
+      // Convert the trending anime to the format expected by the UI
+      const formattedData = trendingAnime.map((anime) => ({
+        ...anime,
+        id: anime.id,
+        title: anime.title,
+        image_url: anime.imageUrl,
+        rating: anime.rating || 0,
+        is_favorite: anime.isFavorite || false,
+        description: anime.description || "",
+        release_date: anime.releaseDate,
+        genres: anime.genres || [],
+      }));
+
+      setAnimeList(formattedData);
+    }
+  }, [trendingAnime]);
+
+  // Load anime data on component mount
+  useEffect(() => {
+    loadAllData();
+  }, [loadAllData]);
+
   // Handle refresh with pull-to-refresh gesture
   const handleRefresh = useCallback(() => {
     console.log("Refreshing anime list");
-    setIsLoading(true);
 
     // Provide haptic feedback for refresh
     try {
@@ -412,13 +360,9 @@ export default function HomeScreen() {
       // Haptics not available, continue silently
     }
 
-    // Simulate refresh with API call
-    setTimeout(() => {
-      // Shuffle the anime list to simulate new data
-      setAnimeList((prev) => [...prev].sort(() => Math.random() - 0.5));
-      setIsLoading(false);
-    }, 1500);
-  }, []);
+    // Fetch fresh data using our hook functions
+    loadAllData();
+  }, [loadAllData]);
 
   // Handle search press
   const handleSearchPress = () => {
@@ -442,12 +386,10 @@ export default function HomeScreen() {
         <Header
           title="AnimeTempo"
           showBack={false}
-          showSearch={true}
+          showSearch={false}
           showNotifications={true}
-          showMenu={true}
-          onSearchPress={handleSearchPress}
+          showMenu={false}
           onNotificationsPress={() => handleMenuItemPress("notifications")}
-          onMenuPress={handleMenuPress}
           notificationCount={3} // Example notification count
         />
         <FilterBar

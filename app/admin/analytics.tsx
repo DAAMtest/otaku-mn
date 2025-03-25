@@ -22,7 +22,9 @@ import {
   Heart,
   Download,
 } from "lucide-react-native";
-import { supabase } from "../lib/supabase";
+import { supabase } from "@/lib/supabase";
+import { useAuth } from "@/context/AuthContext";
+import useAnimeData from "@/hooks/useAnimeData";
 
 // Mock data for charts
 const generateMockData = (days: number, min: number, max: number) => {
@@ -77,6 +79,8 @@ const BarChart = ({ data, color }: { data: any[]; color: string }) => {
  */
 export default function AnalyticsDashboard() {
   const router = useRouter();
+  const { user, session } = useAuth();
+  const { trendingAnime } = useAnimeData();
   const [loading, setLoading] = useState(true);
   const [timeRange, setTimeRange] = useState("week"); // week, month, year
   const [stats, setStats] = useState({
@@ -94,10 +98,14 @@ export default function AnalyticsDashboard() {
     ],
   });
 
-  // Fetch analytics data on component mount
+  // Check authentication and fetch analytics data on component mount
   useEffect(() => {
+    if (!session) {
+      router.replace("/");
+      return;
+    }
     fetchAnalyticsData();
-  }, [timeRange]);
+  }, [timeRange, session, router]);
 
   // Fetch analytics data from API (mock for now)
   const fetchAnalyticsData = async () => {

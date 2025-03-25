@@ -1,13 +1,15 @@
 import { useState, useEffect } from "react";
 import { supabase } from "../lib/supabase";
+import type { Database } from "@lib/database.types";
+import { UUID } from "./useAnimeSearch";
 
 export interface Notification {
-  id: string;
+  id: UUID;
   title: string;
   message: string;
   type: string;
   isRead: boolean;
-  relatedId?: string;
+  relatedId?: UUID;
   createdAt: string;
 }
 
@@ -54,7 +56,7 @@ export function useNotifications(userId: string | null) {
   };
 
   // Mark notification as read
-  const markAsRead = async (notificationId: string) => {
+  const markAsRead = async (notificationId: UUID) => {
     if (!userId) return { error: new Error("User not authenticated") };
 
     try {
@@ -104,7 +106,7 @@ export function useNotifications(userId: string | null) {
   };
 
   // Delete a notification
-  const deleteNotification = async (notificationId: string) => {
+  const deleteNotification = async (notificationId: UUID) => {
     if (!userId) return { error: new Error("User not authenticated") };
 
     try {

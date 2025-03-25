@@ -29,9 +29,12 @@ import FilterBar from "./components/FilterBar";
 import type { Database } from "@/lib/database.types";
 
 type Tables = Database["public"]["Tables"];
+type UUID = string;
 type Anime = Tables["anime"]["Row"] & {
   is_favorite?: boolean;
   genres?: string[];
+  // Using UUID type for all IDs to match Supabase's UUID format
+  id: UUID;
 };
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");

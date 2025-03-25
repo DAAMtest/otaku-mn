@@ -45,6 +45,9 @@ export default function NotificationsScreen() {
     fetchNotifications();
   }, []);
 
+  // In a real app, you would update a global state or context here
+  // For this example, we'll pass the count directly to the BottomNavigation component
+
   // Mock function to fetch notifications
   const fetchNotifications = async () => {
     setLoading(true);
@@ -53,49 +56,67 @@ export default function NotificationsScreen() {
       const mockNotifications: Notification[] = [
         {
           id: "1",
-          title: "New Episode Available",
-          message: "A new episode of Attack on Titan is now available!",
+          title: "New Episode Released",
+          message: "Episode 12 of My Hero Academia Season 6 is now available!",
           type: "info",
           isRead: false,
-          createdAt: new Date(Date.now() - 1000 * 60 * 30).toISOString(), // 30 minutes ago
+          createdAt: new Date(Date.now() - 1000 * 60 * 15).toISOString(), // 15 minutes ago
           relatedId: "1",
         },
         {
           id: "2",
-          title: "Watchlist Update",
-          message: "Demon Slayer Season 2 has been added to your watchlist.",
+          title: "Watchlist Updated",
+          message: "One Piece has been added to your watchlist.",
           type: "update",
-          isRead: true,
-          createdAt: new Date(Date.now() - 1000 * 60 * 60 * 2).toISOString(), // 2 hours ago
-          relatedId: "3",
+          isRead: false,
+          createdAt: new Date(Date.now() - 1000 * 60 * 45).toISOString(), // 45 minutes ago
+          relatedId: "2",
         },
         {
           id: "3",
-          title: "New Anime Release",
-          message:
-            "A new anime 'Chainsaw Man' has been released. Check it out!",
+          title: "New Anime Added",
+          message: "Jujutsu Kaisen Season 2 is now available on our platform!",
           type: "info",
           isRead: false,
-          createdAt: new Date(Date.now() - 1000 * 60 * 60 * 5).toISOString(), // 5 hours ago
+          createdAt: new Date(Date.now() - 1000 * 60 * 60 * 3).toISOString(), // 3 hours ago
+          relatedId: "3",
         },
         {
           id: "4",
-          title: "Account Update",
-          message: "Your profile has been successfully updated.",
+          title: "Friend Activity",
+          message: "Your friend started watching Demon Slayer.",
           type: "update",
           isRead: true,
-          createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString(), // 1 day ago
+          createdAt: new Date(Date.now() - 1000 * 60 * 60 * 12).toISOString(), // 12 hours ago
         },
         {
           id: "5",
-          title: "Subscription Alert",
+          title: "Subscription Reminder",
           message:
-            "Your premium subscription will expire in 3 days. Renew now to avoid interruption.",
+            "Your premium subscription will expire in 2 days. Renew now to continue enjoying ad-free anime!",
           type: "alert",
           isRead: false,
+          createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString(), // 1 day ago
+        },
+        {
+          id: "6",
+          title: "New Comment",
+          message: "Someone replied to your comment on Attack on Titan.",
+          type: "update",
+          isRead: false,
+          createdAt: new Date(Date.now() - 1000 * 60 * 60 * 36).toISOString(), // 1.5 days ago
+        },
+        {
+          id: "7",
+          title: "Weekly Recommendation",
+          message:
+            "Based on your watchlist, you might enjoy Fullmetal Alchemist: Brotherhood.",
+          type: "info",
+          isRead: true,
           createdAt: new Date(
-            Date.now() - 1000 * 60 * 60 * 24 * 2,
-          ).toISOString(), // 2 days ago
+            Date.now() - 1000 * 60 * 60 * 24 * 3,
+          ).toISOString(), // 3 days ago
+          relatedId: "4",
         },
       ];
       setNotifications(mockNotifications);
@@ -442,6 +463,7 @@ export default function NotificationsScreen() {
           currentRoute="/notifications"
           activeTab={activeTab}
           onTabChange={setActiveTab}
+          notificationCount={unreadCount}
         />
       </View>
     </SafeAreaView>
