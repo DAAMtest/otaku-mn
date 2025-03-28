@@ -25,7 +25,6 @@ import {
   Clock,
 } from "lucide-react-native";
 import { useTheme } from "@/context/ThemeProvider";
-import BottomNavigation from "@/components/BottomNavigation";
 import Header from "@/components/Header";
 import { useAuth } from "@/context/AuthContext";
 import useNotifications, { Notification } from "./hooks/useNotifications";
@@ -35,96 +34,23 @@ export default function NotificationsScreen() {
   const { colors, isDarkMode } = useTheme();
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState("notifications");
-  const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [unreadCount, setUnreadCount] = useState(0);
+  
+  // Properly use the useNotifications hook
+  const { 
+    notifications, 
+    unreadCount, 
+    loading, 
+    fetchNotifications, 
+    markAsRead, 
+    markAllAsRead, 
+    deleteNotification
+  } = useNotifications(user?.id || null);
 
   // Fetch notifications on component mount
   useEffect(() => {
     fetchNotifications();
-  }, []);
-
-  // In a real app, you would update a global state or context here
-  // For this example, we'll pass the count directly to the BottomNavigation component
-
-  // Mock function to fetch notifications
-  const fetchNotifications = async () => {
-    setLoading(true);
-    // Simulate API call
-    setTimeout(() => {
-      const mockNotifications: Notification[] = [
-        {
-          id: "1",
-          title: "New Episode Released",
-          message: "Episode 12 of My Hero Academia Season 6 is now available!",
-          type: "info",
-          isRead: false,
-          createdAt: new Date(Date.now() - 1000 * 60 * 15).toISOString(), // 15 minutes ago
-          relatedId: "1",
-        },
-        {
-          id: "2",
-          title: "Watchlist Updated",
-          message: "One Piece has been added to your watchlist.",
-          type: "update",
-          isRead: false,
-          createdAt: new Date(Date.now() - 1000 * 60 * 45).toISOString(), // 45 minutes ago
-          relatedId: "2",
-        },
-        {
-          id: "3",
-          title: "New Anime Added",
-          message: "Jujutsu Kaisen Season 2 is now available on our platform!",
-          type: "info",
-          isRead: false,
-          createdAt: new Date(Date.now() - 1000 * 60 * 60 * 3).toISOString(), // 3 hours ago
-          relatedId: "3",
-        },
-        {
-          id: "4",
-          title: "Friend Activity",
-          message: "Your friend started watching Demon Slayer.",
-          type: "update",
-          isRead: true,
-          createdAt: new Date(Date.now() - 1000 * 60 * 60 * 12).toISOString(), // 12 hours ago
-        },
-        {
-          id: "5",
-          title: "Subscription Reminder",
-          message:
-            "Your premium subscription will expire in 2 days. Renew now to continue enjoying ad-free anime!",
-          type: "alert",
-          isRead: false,
-          createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString(), // 1 day ago
-        },
-        {
-          id: "6",
-          title: "New Comment",
-          message: "Someone replied to your comment on Attack on Titan.",
-          type: "update",
-          isRead: false,
-          createdAt: new Date(Date.now() - 1000 * 60 * 60 * 36).toISOString(), // 1.5 days ago
-        },
-        {
-          id: "7",
-          title: "Weekly Recommendation",
-          message:
-            "Based on your watchlist, you might enjoy Fullmetal Alchemist: Brotherhood.",
-          type: "info",
-          isRead: true,
-          createdAt: new Date(
-            Date.now() - 1000 * 60 * 60 * 24 * 3,
-          ).toISOString(), // 3 days ago
-          relatedId: "4",
-        },
-      ];
-      setNotifications(mockNotifications);
-      setUnreadCount(mockNotifications.filter((n) => !n.isRead).length);
-      setLoading(false);
-      setRefreshing(false);
-    }, 1000);
-  };
+  }, [fetchNotifications]);
 
   // Handle refresh
   const handleRefresh = () => {
@@ -152,12 +78,7 @@ export default function NotificationsScreen() {
 
     // Mark as read
     if (!notification.isRead) {
-      setNotifications((prevNotifications) =>
-        prevNotifications.map((item) =>
-          item.id === notification.id ? { ...item, isRead: true } : item,
-        ),
-      );
-      setUnreadCount((prev) => Math.max(0, prev - 1));
+      markAsRead(notification.id);
     }
 
     // Navigate to related content if available
@@ -195,11 +116,7 @@ export default function NotificationsScreen() {
       // Haptics not available, continue silently
     }
 
-    setNotifications((prevNotifications) =>
-      prevNotifications.map((item) => ({ ...item, isRead: true })),
-    );
-    setUnreadCount(0);
-
+    markAllAsRead();
     Alert.alert("Success", "All notifications marked as read");
   };
 
@@ -221,14 +138,7 @@ export default function NotificationsScreen() {
               // Haptics not available, continue silently
             }
 
-            const notificationToDelete = notifications.find((n) => n.id === id);
-            if (notificationToDelete && !notificationToDelete.isRead) {
-              setUnreadCount((prev) => Math.max(0, prev - 1));
-            }
-
-            setNotifications((prevNotifications) =>
-              prevNotifications.filter((item) => item.id !== id),
-            );
+            deleteNotification(id);
           },
           style: "destructive",
         },
@@ -369,16 +279,7 @@ export default function NotificationsScreen() {
                 styles.actionButton,
                 { backgroundColor: colors.success + "20" },
               ]}
-              onPress={() => {
-                setNotifications((prevNotifications) =>
-                  prevNotifications.map((notification) =>
-                    notification.id === item.id
-                      ? { ...notification, isRead: true }
-                      : notification,
-                  ),
-                );
-                setUnreadCount((prev) => Math.max(0, prev - 1));
-              }}
+              onPress={() => markAsRead(item.id)}
             >
               <Check size={16} color={colors.success} />
             </TouchableOpacity>
@@ -457,13 +358,6 @@ export default function NotificationsScreen() {
           onRefresh={handleRefresh}
           refreshing={refreshing}
           showsVerticalScrollIndicator={false}
-        />
-
-        <BottomNavigation
-          currentRoute="/notifications"
-          activeTab={activeTab}
-          onTabChange={setActiveTab}
-          notificationCount={unreadCount}
         />
       </View>
     </SafeAreaView>

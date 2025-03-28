@@ -3,58 +3,91 @@ import { useColorScheme as useNativeColorScheme } from 'react-native';
 import type { PropsWithChildren } from 'react';
 
 // Define our theme colors
-export const lightTheme = {
-  // Deku-inspired color scheme with light mode variants
-  primary: '#1A7852', // Emerald Green - Deku's jumpsuit
-  primaryLight: '#2C9A6D', // Lighter green for hover states
-  primaryDark: '#116141', // Darker green for pressed states
-  secondary: '#E63946', // Bright Red - Deku's shoes and energy effects
-  secondaryLight: '#F05D69', // Lighter red for hover states
-  secondaryDark: '#C42836', // Darker red for pressed states
-  background: '#F9FAFB', // Light background
-  text: '#111827', // Dark text for light mode
-  textSecondary: '#4B5563', // Secondary text
-  border: '#E5E7EB', // Light border
-  success: '#10B981', // Green
-  error: '#EF4444', // Red
-  warning: '#F59E0B', // Amber
-  info: '#3B82F6', // Blue
-  card: '#FFFFFF', // Card background
-  cardHover: '#F3F4F6', // Card hover state
-  inactive: '#9CA3AF', // Inactive state
-  skeleton: '#E5E7EB', // Skeleton loading state
-  overlay: 'rgba(0, 0, 0, 0.5)', // Modal overlay
+interface Theme {
+  primary: string;
+  primaryLight: string;
+  primaryDark: string;
+  secondary: string;
+  secondaryLight: string;
+  secondaryDark: string;
+  background: string;
+  text: string;
+  textSecondary: string;
+  border: string;
+  error: string;
+  success: string;
+  warning: string;
+  info: string;
+  overlay: string;
+  yellow: string;
+  red: string;
+  white: string;
+  card: string;
+  cardHover: string;
+  inactive: string;
+  skeleton: string;
+  placeholder?: string;
+  statusBar?: string;
+}
+
+export const lightTheme: Theme = {
+  primary: "#1E40AF",
+  primaryLight: "#3B82F6",
+  primaryDark: "#1D4ED8",
+  secondary: "#4F46E5",
+  secondaryLight: "#7C3AED",
+  secondaryDark: "#4338CA",
+  background: "#F9FAFB", // Lighter background for better contrast
+  text: "#111827", // Darker text for better readability
+  textSecondary: "#4B5563", // Darker secondary text
+  border: "#E5E7EB",
+  error: "#EF4444",
+  success: "#22C55E",
+  warning: "#F59E0B",
+  info: "#3B82F6",
+  overlay: "rgba(0, 0, 0, 0.5)",
+  yellow: "#F59E0B", // More consistent yellow
+  red: "#EF4444", // More consistent red
+  white: "#FFFFFF",
+  card: "#FFFFFF",
+  cardHover: "#F3F4F6",
+  inactive: "#9CA3AF",
+  skeleton: "#E5E7EB",
+  placeholder: "#9CA3AF", // Added placeholder color
+  statusBar: "dark-content", // Added status bar style
 };
 
-export const darkTheme = {
-  // Deku-inspired color scheme
-  primary: '#2C9A6D', // Slightly lighter green for dark mode
-  primaryLight: '#3DAC7F', // Even lighter green for hover states
-  primaryDark: '#1A7852', // Original green for pressed states
-  secondary: '#F05D69', // Slightly lighter red for dark mode
-  secondaryLight: '#F47F89', // Even lighter red for hover states
-  secondaryDark: '#E63946', // Original red for pressed states
-  background: '#111827', // Dark background
-  text: '#F9FAFB', // Light text for dark mode
-  textSecondary: '#D1D5DB', // Secondary text
-  border: '#374151', // Dark border
-  success: '#34D399', // Lighter green for dark mode
-  error: '#F87171', // Lighter red for dark mode
-  warning: '#FBBF24', // Lighter amber for dark mode
-  info: '#60A5FA', // Lighter blue for dark mode
-  card: '#1F2937', // Card background
-  cardHover: '#374151', // Card hover state
-  inactive: '#6B7280', // Inactive state
-  skeleton: '#374151', // Skeleton loading state
-  overlay: 'rgba(0, 0, 0, 0.75)', // Modal overlay
+export const darkTheme: Theme = {
+  primary: "#3B82F6",
+  primaryLight: "#60A5FA",
+  primaryDark: "#1D4ED8",
+  secondary: "#7C3AED",
+  secondaryLight: "#A78BFA",
+  secondaryDark: "#4338CA",
+  background: "#0F172A", // Darker background for better contrast
+  text: "#F9FAFB", // Brighter text for better readability
+  textSecondary: "#9CA3AF",
+  border: "#374151",
+  error: "#F87171",
+  success: "#34D399",
+  warning: "#FBBF24",
+  info: "#60A5FA",
+  overlay: "rgba(0, 0, 0, 0.8)",
+  yellow: "#FBBF24", // More consistent yellow
+  red: "#EF4444", // More consistent red
+  white: "#FFFFFF",
+  card: "#1E293B", // Slightly lighter card background for better distinction
+  cardHover: "#334155", // Darker hover state
+  inactive: "#6B7280",
+  skeleton: "#374151",
+  placeholder: "#6B7280", // Added placeholder color
+  statusBar: "light-content", // Added status bar style
 };
-
-type ThemeColors = typeof lightTheme;
 
 type ThemeContextType = {
   isDarkMode: boolean;
   toggleTheme: () => void;
-  colors: ThemeColors;
+  colors: Theme;
 };
 
 const ThemeContext = createContext<ThemeContextType>({

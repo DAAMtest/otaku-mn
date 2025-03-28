@@ -10,7 +10,7 @@ import {
   SafeAreaView,
 } from "react-native";
 import { useRouter } from "expo-router";
-import { ArrowLeft, Bell, Home } from "lucide-react-native";
+import { ArrowLeft, Bell, Home, Search } from "lucide-react-native";
 import { useTheme } from "@/context/ThemeProvider";
 import Typography from "./Typography";
 import { useToast } from "@/context/ToastContext";
@@ -41,8 +41,8 @@ const { width: SCREEN_WIDTH } = Dimensions.get("window");
 const Header = ({
   title = "AnimeTempo",
   showBack = false,
-  showSearch = false,
-  showNotifications = false,
+  showSearch = true,
+  showNotifications = true,
   showMenu = false,
   showHome = false,
   onMenuPress,
@@ -173,7 +173,6 @@ const Header = ({
           styles.container,
           {
             backgroundColor: headerBackgroundColor,
-            shadowOpacity: headerShadowOpacity,
             borderBottomColor: colors.border,
             borderBottomWidth: transparent ? 0 : 1,
           },
@@ -219,7 +218,11 @@ const Header = ({
               )}
 
               <View style={styles.titleContainer}>
-                <Typography variant="h2" numberOfLines={1} style={styles.title}>
+                <Typography
+                  variant="h2"
+                  numberOfLines={1}
+                  style={[styles.title, { fontSize: 20, fontWeight: "bold" }]}
+                >
                   {title}
                 </Typography>
 
@@ -236,39 +239,67 @@ const Header = ({
             </View>
 
             <View style={styles.rightContainer}>
-              {showNotifications && (
-                <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
-                  <TouchableOpacity
-                    onPress={handleNotificationsPress}
-                    style={[
-                      styles.iconButton,
-                      { backgroundColor: colors.cardHover },
-                    ]}
-                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                    accessibilityRole="button"
-                    accessibilityLabel="Notifications"
-                    activeOpacity={0.7}
-                  >
-                    <Bell size={20} color={colors.text} />
-                    {notificationCount > 0 && (
-                      <View
-                        style={[
-                          styles.badge,
-                          { backgroundColor: colors.error },
-                        ]}
+              <Animated.View style={{ transform: [{ scale: scaleAnim }], marginRight: 12 }}>
+                <TouchableOpacity
+                  onPress={handleSearchPress}
+                  style={[
+                    styles.iconButton,
+                    { 
+                      backgroundColor: isDarkMode ? 'rgba(45, 55, 72, 0.8)' : colors.cardHover,
+                      elevation: 2,
+                      shadowColor: "#000",
+                      shadowOffset: { width: 0, height: 1 },
+                      shadowOpacity: 0.2,
+                      shadowRadius: 1.5,
+                    },
+                  ]}
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                  accessibilityRole="button"
+                  accessibilityLabel="Search"
+                  activeOpacity={0.7}
+                >
+                  <Search size={20} color={colors.text} />
+                </TouchableOpacity>
+              </Animated.View>
+              
+              <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
+                <TouchableOpacity
+                  onPress={handleNotificationsPress}
+                  style={[
+                    styles.iconButton,
+                    { 
+                      backgroundColor: isDarkMode ? 'rgba(45, 55, 72, 0.8)' : colors.cardHover,
+                      elevation: 2,
+                      shadowColor: "#000",
+                      shadowOffset: { width: 0, height: 1 },
+                      shadowOpacity: 0.2,
+                      shadowRadius: 1.5,
+                    },
+                  ]}
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                  accessibilityRole="button"
+                  accessibilityLabel="Notifications"
+                  activeOpacity={0.7}
+                >
+                  <Bell size={20} color={colors.text} />
+                  {notificationCount > 0 && (
+                    <View
+                      style={[
+                        styles.badge,
+                        { backgroundColor: colors.error },
+                      ]}
+                    >
+                      <Typography
+                        variant="caption"
+                        style={styles.badgeText}
+                        color="#FFFFFF"
                       >
-                        <Typography
-                          variant="caption"
-                          style={styles.badgeText}
-                          color="#FFFFFF"
-                        >
-                          {notificationCount > 9 ? "9+" : notificationCount}
-                        </Typography>
-                      </View>
-                    )}
-                  </TouchableOpacity>
-                </Animated.View>
-              )}
+                        {notificationCount > 9 ? "9+" : notificationCount}
+                      </Typography>
+                    </View>
+                  )}
+                </TouchableOpacity>
+              </Animated.View>
             </View>
           </View>
         </SafeAreaView>
@@ -283,19 +314,16 @@ const STATUSBAR_HEIGHT =
 const styles = StyleSheet.create({
   container: {
     width: "100%",
-    paddingTop: Platform.OS === "android" ? STATUSBAR_HEIGHT : 0,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowRadius: 4,
-    elevation: 4,
-    zIndex: 100,
+    paddingTop: STATUSBAR_HEIGHT,
+    borderBottomWidth: 1,
+    zIndex: 10,
   },
   headerContent: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingVertical: 12,
     paddingHorizontal: 16,
+    paddingVertical: 10,
     width: "100%",
   },
   leftContainer: {
@@ -303,24 +331,24 @@ const styles = StyleSheet.create({
     alignItems: "center",
     flex: 1,
   },
-  titleContainer: {
-    marginLeft: 12,
-    flex: 1,
-    justifyContent: "center",
-  },
   rightContainer: {
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "flex-end",
+  },
+  titleContainer: {
+    flex: 1,
+    marginLeft: 8,
   },
   title: {
-    flex: 1,
+    fontSize: 20,
+    fontWeight: "bold",
   },
   iconButton: {
-    padding: 8,
     marginLeft: 4,
     borderRadius: 20,
-    width: 36,
-    height: 36,
+    width: 40,
+    height: 40,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -328,12 +356,14 @@ const styles = StyleSheet.create({
     position: "absolute",
     top: -4,
     right: -4,
-    minWidth: 16,
-    height: 16,
-    borderRadius: 8,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: 4,
+    borderWidth: 1.5,
+    borderColor: "#0F172A",
   },
   badgeText: {
     fontSize: 10,

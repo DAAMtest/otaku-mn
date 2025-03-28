@@ -16,6 +16,7 @@ import Button from "@/components/Button";
 import { ChevronLeft } from "lucide-react-native";
 import { supabase } from "@/lib/supabase";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { Database } from '@/types/database';
 
 // Interface for episode data
 interface Episode {
@@ -157,7 +158,7 @@ export default function WatchScreen() {
 
           if (episodesData && episodesData.length > 0) {
             // Format episodes data
-            const formattedEpisodes: Episode[] = episodesData.map((ep) => ({
+            const formattedEpisodes: Episode[] = episodesData.map((ep: Database["public"]["Tables"]["episodes"]["Row"]) => ({
               id: ep.id,
               title: `Episode ${ep.episode_number}: ${ep.title}`,
               description: ep.description || "",
@@ -269,7 +270,7 @@ export default function WatchScreen() {
           episode_id: episode.id,
           watched_at: new Date().toISOString(),
         })
-        .then(({ error }) => {
+        .then(({ error }: { error: Error | null }) => {
           if (error) console.error("Error updating watch history:", error);
         });
     }
@@ -326,7 +327,7 @@ export default function WatchScreen() {
           <Button
             onPress={() => router.back()}
             variant="primary"
-            label="Go Back"
+            title="Go Back"
             style={styles.errorButton}
           />
         </View>
@@ -368,48 +369,32 @@ export default function WatchScreen() {
               onPress={() => router.back()}
               variant="ghost"
               leftIcon={<ChevronLeft size={20} color={colors.text} />}
-              label="Back"
+              title="Back"
             />
           </View>
 
           {/* Anime details */}
           <View style={styles.detailsContainer}>
-            <Typography variant="h1" color={colors.text} weight="700">
+            <Typography
+              variant="h1"
+              color={colors.text}
+              weight="700"
+            >
               {animeDetails.title}
             </Typography>
 
             {animeDetails.season && (
               <Typography
-                variant="bodyLarge"
-                color={colors.primary}
-                weight="600"
-                style={styles.seasonText}
+                variant="body"
+                color={colors.textSecondary}
               >
-                {animeDetails.season}
+                Season {animeDetails.season}
               </Typography>
-            )}
-
-            {animeDetails.genres && animeDetails.genres.length > 0 && (
-              <View style={styles.genresContainer}>
-                {animeDetails.genres.map((genre, index) => (
-                  <View
-                    key={index}
-                    style={[
-                      styles.genreBadge,
-                      { backgroundColor: colors.card },
-                    ]}
-                  >
-                    <Typography variant="caption" color={colors.textSecondary}>
-                      {genre}
-                    </Typography>
-                  </View>
-                ))}
-              </View>
             )}
 
             <Typography
               variant="body"
-              color={colors.textSecondary}
+              color={colors.text}
               style={styles.description}
             >
               {animeDetails.description}
@@ -421,7 +406,6 @@ export default function WatchScreen() {
             <Typography
               variant="h2"
               color={colors.text}
-              weight="600"
               style={styles.episodesTitle}
             >
               Episodes

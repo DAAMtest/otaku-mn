@@ -17,9 +17,9 @@ import type { Database } from "@/lib/database.types";
 import { Anime, UUID } from "@/hooks/useAnimeSearch";
 
 interface AnimeListItem extends Anime {
-  episode_count?: number;
-  release_year?: number;
-  is_new?: boolean;
+  episodeCount?: number;
+  releaseYear?: number;
+  isNew?: boolean;
 }
 
 interface AnimeHorizontalListProps {
@@ -61,12 +61,12 @@ const AnimeHorizontalList = React.memo(function AnimeHorizontalList({
       <AnimeCard
         id={item.id}
         title={item.title}
-        imageUrl={item.image_url}
+        imageUrl={item.imageUrl}
         rating={item.rating ?? undefined}
-        isFavorite={item.is_favorite}
-        episodeCount={item.episode_count}
-        releaseYear={item.release_year}
-        isNew={item.is_new}
+        isFavorite={item.isFavorite}
+        episodeCount={item.episodeCount}
+        releaseYear={item.releaseYear}
+        isNew={item.isNew}
         onPress={handlePress}
         onFavoritePress={() => onFavorite?.(item)}
         size="medium"

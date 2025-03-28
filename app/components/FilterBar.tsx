@@ -12,10 +12,16 @@ import {
 import { useTheme } from "@/context/ThemeProvider";
 import { Filter as FilterIcon } from "lucide-react-native";
 
+interface FilterOption {
+  id: string;
+  label: string;
+  icon: string;
+}
+
 interface FilterBarProps {
-  filters: string[];
-  selectedFilters: string[];
-  onFilterPress: (filter: string) => void;
+  options: FilterOption[];
+  selectedOptions: string[];
+  onOptionPress: (option: FilterOption) => void;
   isLoading?: boolean;
   title?: string;
   onFilterButtonPress?: () => void;
@@ -31,9 +37,9 @@ const { width: SCREEN_WIDTH } = Dimensions.get("window");
  * @returns FilterBar component
  */
 const FilterBar = React.memo(function FilterBar({
-  filters = [],
-  selectedFilters = [],
-  onFilterPress,
+  options = [],
+  selectedOptions = [],
+  onOptionPress,
   isLoading = false,
   title = "Filters",
   onFilterButtonPress,
@@ -52,7 +58,7 @@ const FilterBar = React.memo(function FilterBar({
   }, []);
 
   // Sort filters alphabetically
-  const sortedFilters = [...filters].sort((a, b) => a.localeCompare(b));
+  const sortedOptions = [...options].sort((a, b) => a.label.localeCompare(b.label));
 
   // Create loading placeholders data
   const loadingPlaceholders = isLoading
@@ -62,7 +68,7 @@ const FilterBar = React.memo(function FilterBar({
     : [];
 
   // Handle filter press with haptic feedback
-  const handleFilterPress = (filter: string) => {
+  const handleOptionPress = (option: FilterOption) => {
     // Add haptic feedback
     try {
       const Haptics = require("expo-haptics");
@@ -71,32 +77,42 @@ const FilterBar = React.memo(function FilterBar({
       // Haptics not available, continue silently
     }
 
-    onFilterPress(filter);
+    onOptionPress(option);
   };
 
-  const renderFilterItem = ({ item: filter }: { item: string }) => {
-    const isSelected = selectedFilters.includes(filter);
+  const renderFilterItem = ({ item: option }: { item: FilterOption }) => {
+    const isSelected = selectedOptions.includes(option.id);
     return (
       <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
         <TouchableOpacity
-          onPress={() => handleFilterPress(filter)}
+          onPress={() => handleOptionPress(option)}
           style={[
             styles.filterButton,
             {
               backgroundColor: isSelected
                 ? colors.primary
                 : isDarkMode
-                  ? "rgba(45, 55, 72, 0.8)"
-                  : "rgba(237, 242, 247, 0.8)",
-              borderColor: isSelected ? colors.primary : colors.border,
+                  ? "rgba(30, 41, 59, 0.95)"
+                  : "rgba(237, 242, 247, 0.9)",
+              borderColor: isSelected
+                ? colors.primary
+                : isDarkMode
+                  ? "rgba(51, 65, 85, 0.8)"
+                  : "rgba(203, 213, 225, 0.8)",
+              borderWidth: 1,
+              shadowColor: isDarkMode ? "rgba(0, 0, 0, 0.3)" : "rgba(0, 0, 0, 0.1)",
+              shadowOffset: { width: 0, height: 1 },
+              shadowOpacity: 0.8,
+              shadowRadius: 1,
+              elevation: 2,
             },
           ]}
           activeOpacity={0.7}
           accessibilityRole="button"
-          accessibilityLabel={`Filter by ${filter}`}
+          accessibilityLabel={`Filter by ${option.label}`}
           accessibilityState={{ selected: isSelected }}
           accessibilityHint={
-            isSelected ? `Remove ${filter} filter` : `Add ${filter} filter`
+            isSelected ? `Remove ${option.label} filter` : `Add ${option.label} filter`
           }
         >
           <Text
@@ -104,16 +120,15 @@ const FilterBar = React.memo(function FilterBar({
               styles.filterText,
               {
                 color: isSelected
-                  ? isDarkMode
-                    ? "#FFFFFF"
-                    : "#FFFFFF"
-                  : colors.textSecondary,
+                  ? colors.white
+                  : isDarkMode
+                    ? "rgba(255, 255, 255, 0.9)"
+                    : "rgba(15, 23, 42, 0.9)",
                 fontWeight: isSelected ? "600" : "500",
               },
             ]}
-            numberOfLines={1}
           >
-            {filter}
+            {option.label}
           </Text>
         </TouchableOpacity>
       </Animated.View>
@@ -135,131 +150,85 @@ const FilterBar = React.memo(function FilterBar({
   );
 
   return (
-    <View style={styles.container}>
-      <View style={styles.headerContainer}>
-        <Text style={[styles.title, { color: colors.text }]}>{title}</Text>
-
-        {onFilterButtonPress && (
-          <TouchableOpacity
-            onPress={onFilterButtonPress}
-            style={[
-              styles.filterAllButton,
-              { backgroundColor: colors.cardHover },
-            ]}
-            activeOpacity={0.7}
-            accessibilityRole="button"
-            accessibilityLabel="Advanced filters"
-          >
-            <FilterIcon size={16} color={colors.text} />
-            <Text style={[styles.filterAllText, { color: colors.text }]}>
-              All Filters
-            </Text>
-          </TouchableOpacity>
-        )}
-      </View>
-
-      {isLoading ? (
-        <FlatList
-          horizontal
-          data={loadingPlaceholders}
-          renderItem={renderLoadingItem}
-          keyExtractor={(item) => item.id}
-          contentContainerStyle={styles.scrollContent}
-          style={styles.scrollView}
-          showsHorizontalScrollIndicator={false}
-          accessibilityLabel="Loading filters"
-        />
-      ) : filters.length === 0 ? (
-        <View style={styles.scrollView}>
-          <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
-            No filters available
-          </Text>
+    <View style={[styles.container, { backgroundColor: isDarkMode ? '#1E293B' : '#F1F5F9' }]}>
+      {title && (
+        <View style={styles.headerContainer}>
+          <Text style={[styles.title, { color: colors.text }]}>{title}</Text>
+          {onFilterButtonPress && (
+            <TouchableOpacity
+              onPress={onFilterButtonPress}
+              style={[
+                styles.filterIconButton,
+                { backgroundColor: colors.card },
+              ]}
+              activeOpacity={0.7}
+            >
+              <FilterIcon size={16} color={colors.text} />
+            </TouchableOpacity>
+          )}
         </View>
-      ) : (
-        <FlatList
-          horizontal
-          data={sortedFilters}
-          renderItem={renderFilterItem}
-          keyExtractor={(item, index) => `filter-${index}-${item}`}
-          contentContainerStyle={styles.scrollContent}
-          style={styles.scrollView}
-          showsHorizontalScrollIndicator={false}
-          accessibilityLabel="Filter options"
-          initialNumToRender={5}
-          maxToRenderPerBatch={10}
-          windowSize={5}
-          decelerationRate="fast"
-        />
       )}
+
+      <FlatList
+        data={isLoading ? loadingPlaceholders : sortedOptions}
+        renderItem={isLoading ? renderLoadingItem : renderFilterItem as any}
+        keyExtractor={(item: any) =>
+          typeof item === "string" ? item : item.id
+        }
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.filterList}
+        ItemSeparatorComponent={() => <View style={styles.separator} />}
+      />
     </View>
   );
 });
 
 const styles = StyleSheet.create({
   container: {
-    marginBottom: 16,
-    width: "100%",
+    paddingTop: 8,
+    paddingBottom: 12,
   },
   headerContainer: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
     paddingHorizontal: 16,
-    marginBottom: 8,
+    marginBottom: 12,
   },
   title: {
     fontSize: 18,
-    fontWeight: "bold",
+    fontWeight: "700",
   },
-  filterAllButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
-  },
-  filterAllText: {
-    fontSize: 12,
-    fontWeight: "500",
-    marginLeft: 4,
-  },
-  scrollView: {
-    paddingVertical: 8,
-  },
-  scrollContent: {
+  filterList: {
     paddingHorizontal: 16,
-    paddingRight: 24, // Extra padding at the end for better UX
+    paddingBottom: 4,
   },
   filterButton: {
     paddingHorizontal: 16,
-    paddingVertical: 8,
+    paddingVertical: 10,
     borderRadius: 20,
-    marginRight: 8,
-    borderWidth: 1,
-    elevation: 2,
+    elevation: 3,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.2,
-    shadowRadius: 1,
-    minWidth: 80, // Ensure minimum width for better touch targets
-    alignItems: "center",
-    justifyContent: "center",
+    shadowRadius: 2,
   },
   filterText: {
-    fontWeight: "500",
     fontSize: 14,
-    textAlign: "center",
+  },
+  separator: {
+    width: 10,
+  },
+  filterIconButton: {
+    padding: 8,
+    borderRadius: 20,
   },
   loadingPlaceholder: {
+    width: 80,
     height: 36,
-    width: Platform.OS === "ios" ? 90 : 80,
     borderRadius: 20,
     marginRight: 8,
-    opacity: 0.5,
-  },
-  emptyText: {
-    paddingHorizontal: 16,
-    fontSize: 14,
   },
 });
 

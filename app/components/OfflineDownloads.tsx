@@ -205,7 +205,7 @@ const OfflineDownloads = ({ onPlayPress }: OfflineDownloadsProps) => {
           style={styles.emptyIcon}
         />
         <Typography
-          variant="bodyLarge"
+          variant="h3"
           color={colors.text}
           weight="600"
           style={styles.emptyTitle}

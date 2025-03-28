@@ -397,7 +397,7 @@ const VideoPlayer = ({
             </TouchableOpacity>
 
             <View style={styles.titleContainer}>
-              <Typography variant="bodyLarge" color="white" weight="600">
+              <Typography variant="body" color="white" weight="600">
                 {title}
               </Typography>
               <Typography variant="bodySmall" color="white">
@@ -537,7 +537,7 @@ const VideoPlayer = ({
       {showSettings && (
         <View style={styles.settingsMenu}>
           <Typography
-            variant="bodyLarge"
+            variant="body"
             color="white"
             weight="600"
             style={styles.settingsTitle}
@@ -570,7 +570,7 @@ const VideoPlayer = ({
       {showSubtitles && (
         <View style={styles.settingsMenu}>
           <Typography
-            variant="bodyLarge"
+            variant="body"
             color="white"
             weight="600"
             style={styles.settingsTitle}

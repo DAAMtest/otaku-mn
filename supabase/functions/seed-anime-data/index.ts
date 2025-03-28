@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createClient } from "@supabase/supabase-js";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -7,21 +7,39 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type",
 };
 
-serve(async (req) => {
+interface AnimeData {
+  title: string;
+  image_url: string;
+  rating: number;
+  description: string;
+  release_date: string;
+  genres: string[];
+}
+
+interface Genre {
+  id: string;
+  name: string;
+}
+
+serve(async (req: Request) => {
   // Handle CORS preflight request
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
 
   try {
+    const supabaseUrl = Deno.env.get("SUPABASE_URL");
+    const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+
+    if (!supabaseUrl || !supabaseKey) {
+      throw new Error("Missing Supabase environment variables");
+    }
+
     // Create a Supabase client with the Auth context of the function
-    const supabaseClient = createClient(
-      Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
-    );
+    const supabaseClient = createClient(supabaseUrl, supabaseKey);
 
     // Sample anime data
-    const animeData = [
+    const animeData: AnimeData[] = [
       {
         title: "Attack on Titan",
         image_url:
@@ -113,59 +131,72 @@ serve(async (req) => {
       throw genresError;
     }
 
+    if (!genresData) {
+      throw new Error("No genres found in database");
+    }
+
     // Create a map of genre names to IDs
-    const genreMap = new Map();
-    genresData.forEach((genre) => {
+    const genreMap = new Map<string, string>();
+    genresData.forEach((genre: Genre) => {
       genreMap.set(genre.name, genre.id);
     });
 
     // Insert anime data and link to genres
     for (const anime of animeData) {
-      // Insert anime
-      const { data: animeInsertData, error: animeInsertError } =
-        await supabaseClient
-          .from("anime")
-          .insert({
-            title: anime.title,
-            image_url: anime.image_url,
-            rating: anime.rating,
-            description: anime.description,
-            release_date: anime.release_date,
-          })
-          .select("id")
-          .single();
+      try {
+        // Insert anime
+        const { data: animeInsertData, error: animeInsertError } =
+          await supabaseClient
+            .from("anime")
+            .insert({
+              title: anime.title,
+              image_url: anime.image_url,
+              rating: anime.rating,
+              description: anime.description,
+              release_date: anime.release_date,
+            })
+            .select("id")
+            .single();
 
-      if (animeInsertError) {
-        console.error(
-          `Error inserting anime ${anime.title}:`,
-          animeInsertError,
-        );
-        continue;
-      }
-
-      const animeId = animeInsertData.id;
-
-      // Link anime to genres
-      for (const genreName of anime.genres) {
-        const genreId = genreMap.get(genreName);
-        if (!genreId) {
-          console.warn(`Genre ${genreName} not found in database`);
+        if (animeInsertError) {
+          console.error(
+            `Error inserting anime ${anime.title}:`,
+            animeInsertError.message
+          );
           continue;
         }
 
-        const { error: linkError } = await supabaseClient
-          .from("anime_genres")
-          .insert({
-            anime_id: animeId,
-            genre_id: genreId,
-          });
-
-        if (linkError) {
-          console.error(
-            `Error linking anime ${anime.title} to genre ${genreName}:`,
-            linkError,
-          );
+        if (!animeInsertData) {
+          console.error(`No data returned after inserting anime ${anime.title}`);
+          continue;
         }
+
+        const animeId = animeInsertData.id;
+
+        // Link anime to genres
+        for (const genreName of anime.genres) {
+          const genreId = genreMap.get(genreName);
+          if (!genreId) {
+            console.warn(`Genre ${genreName} not found in database`);
+            continue;
+          }
+
+          const { error: linkError } = await supabaseClient
+            .from("anime_genres")
+            .insert({
+              anime_id: animeId,
+              genre_id: genreId,
+            });
+
+          if (linkError) {
+            console.error(
+              `Error linking anime ${anime.title} to genre ${genreName}:`,
+              linkError.message
+            );
+          }
+        }
+      } catch (error) {
+        console.error(`Error processing anime ${anime.title}:`, error instanceof Error ? error.message : "Unknown error");
       }
     }
 
@@ -177,12 +208,16 @@ serve(async (req) => {
       {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
         status: 200,
-      },
+      }
     );
   } catch (error) {
-    return new Response(JSON.stringify({ error: error.message }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-      status: 400,
-    });
+    const errorMessage = error instanceof Error ? error.message : "An unknown error occurred";
+    return new Response(
+      JSON.stringify({ error: errorMessage }),
+      {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 400,
+      }
+    );
   }
 });

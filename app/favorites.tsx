@@ -3,401 +3,316 @@ import {
   View,
   Text,
   SafeAreaView,
-  StatusBar,
-  TouchableOpacity,
   FlatList,
   Image,
-  Alert,
+  TouchableOpacity,
   ActivityIndicator,
+  StyleSheet,
+  Alert,
 } from "react-native";
 import { useRouter } from "expo-router";
-import {
-  ArrowLeft,
-  Heart,
-  Trash2,
-  Star,
-  Info,
-  BookmarkIcon,
-  Eye,
-} from "lucide-react-native";
+import { Heart, Star, MoreVertical } from "lucide-react-native";
 import { useTheme } from "@/context/ThemeProvider";
-import BottomNavigation from "@/components/BottomNavigation";
 import { useAuth } from "@/context/AuthContext";
-
-type UUID = string;
-
-interface AnimeItem {
-  id: UUID;
-  title: string;
-  imageUrl: string;
-  rating: number;
-  addedDate: string;
-  genres?: string[];
-}
+import Header from "@/components/Header";
+import useAnimeLists from "@/hooks/useAnimeLists";
+import { supabase } from "@/lib/supabase";
 
 export default function FavoritesScreen() {
   const router = useRouter();
   const { colors, isDarkMode } = useTheme();
-  const { user, isLoading: authLoading } = useAuth();
-  const [activeTab, setActiveTab] = useState("favorites");
-  const [favorites, setFavorites] = useState<AnimeItem[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { user } = useAuth();
+  const [refreshing, setRefreshing] = useState(false);
 
-  // Fetch favorites on component mount
-  useEffect(() => {
-    fetchFavorites();
-  }, []);
+  // Use the useAnimeLists hook to fetch favorites
+  const { 
+    lists, 
+    loading, 
+    error, 
+    fetchList, 
+    removeFromList 
+  } = useAnimeLists(user?.id || null);
 
-  // Mock function to fetch favorites
-  const fetchFavorites = async () => {
-    setLoading(true);
-    // Simulate API call
-    setTimeout(() => {
-      const mockFavorites: AnimeItem[] = [
-        {
-          id: "1",
-          title: "Attack on Titan",
-          imageUrl:
-            "https://images.unsplash.com/photo-1541562232579-512a21360020?w=400&q=80",
-          rating: 4.8,
-          addedDate: "2023-10-20",
-          genres: ["Action", "Drama", "Fantasy"],
-        },
-        {
-          id: "3",
-          title: "Demon Slayer",
-          imageUrl:
-            "https://images.unsplash.com/photo-1578632767115-351597cf2477?w=400&q=80",
-          rating: 4.9,
-          addedDate: "2023-09-15",
-          genres: ["Action", "Fantasy", "Horror"],
-        },
-        {
-          id: "6",
-          title: "Naruto Shippuden",
-          imageUrl:
-            "https://images.unsplash.com/photo-1601850494422-3cf14624b0b3?w=400&q=80",
-          rating: 4.5,
-          addedDate: "2023-11-05",
-          genres: ["Action", "Adventure", "Fantasy"],
-        },
-        {
-          id: "8",
-          title: "Fullmetal Alchemist: Brotherhood",
-          imageUrl:
-            "https://images.unsplash.com/photo-1614583225154-5fcdda07019e?w=400&q=80",
-          rating: 4.9,
-          addedDate: "2023-08-10",
-          genres: ["Action", "Adventure", "Drama"],
-        },
-      ];
-      setFavorites(mockFavorites);
-      setLoading(false);
-    }, 1000);
+  // Handle refresh
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    await fetchList("favorites");
+    setRefreshing(false);
   };
 
-  // Handle back button press
-  const handleBackPress = () => {
-    router.back();
+  // Handle removing from favorites
+  const handleRemoveFromFavorites = async (animeId: string) => {
+    try {
+      await removeFromList(animeId, "favorites");
+      Alert.alert("Success", "Removed from favorites");
+    } catch (error) {
+      console.error("Error removing from favorites:", error);
+      Alert.alert("Error", "Failed to remove from favorites");
+    }
   };
 
-  // Handle anime press
-  const handleAnimePress = (anime: AnimeItem) => {
-    Alert.alert("Anime Details", `Viewing details for ${anime.title}`);
-  };
-
-  // Handle remove from favorites
-  const handleRemoveFromFavorites = (anime: AnimeItem) => {
+  // Handle anime options
+  const handleAnimeOptions = (animeId: string) => {
     Alert.alert(
-      "Remove from Favorites",
-      `Are you sure you want to remove "${anime.title}" from your favorites?`,
+      "Anime Options",
+      "Select an option",
       [
         { text: "Cancel", style: "cancel" },
         {
-          text: "Remove",
-          onPress: () => {
-            // Remove from favorites
-            setFavorites(favorites.filter((item) => item.id !== anime.id));
-            Alert.alert("Success", `"${anime.title}" removed from favorites`);
-          },
+          text: "View Details",
+          onPress: () => router.push(`/anime/${animeId}`),
+        },
+        {
+          text: "Remove from Favorites",
+          onPress: () => handleRemoveFromFavorites(animeId),
           style: "destructive",
         },
       ],
+      { cancelable: true }
     );
-  };
-
-  // Handle add to list
-  const handleAddToList = (anime: AnimeItem, listType: string) => {
-    Alert.alert("Success", `"${anime.title}" added to ${listType}`);
   };
 
   // Render anime item
-  const renderAnimeItem = ({ item }: { item: AnimeItem }) => (
+  const renderAnimeItem = ({ item }: { item: any }) => (
     <TouchableOpacity
-      style={{
-        flexDirection: "row",
-        backgroundColor: colors.card,
-        borderRadius: 8,
-        padding: 12,
-        marginBottom: 12,
-      }}
-      onPress={() => handleAnimePress(item)}
+      style={styles.animeItem}
+      onPress={() => router.push(`/anime/${item.anime_id || item.id}`)}
       activeOpacity={0.7}
     >
       <Image
-        source={{ uri: item.imageUrl }}
-        style={{ width: 80, height: 112, borderRadius: 6 }}
+        source={{ uri: item.anime?.imageUrl || item.imageUrl }}
+        style={[
+          styles.animeImage,
+          {
+            backgroundColor: isDarkMode ? "#1f2937" : "#e5e7eb",
+          },
+        ]}
         resizeMode="cover"
       />
-
       <View
-        style={{ flex: 1, marginLeft: 12, justifyContent: "space-between" }}
+        style={[
+          styles.animeDetails,
+          {
+            backgroundColor: colors.card,
+          },
+        ]}
       >
-        <View>
+        <Text
+          style={[
+            styles.animeTitle,
+            {
+              color: colors.text,
+            },
+          ]}
+          numberOfLines={1}
+        >
+          {item.anime?.title || item.title}
+        </Text>
+
+        <View style={styles.ratingContainer}>
+          <Star
+            size={14}
+            color={colors.warning}
+            fill={colors.warning}
+            style={{ marginRight: 4 }}
+          />
           <Text
-            style={{ color: colors.text, fontWeight: "600" }}
-            numberOfLines={2}
+            style={[
+              styles.ratingText,
+              {
+                color: colors.textSecondary,
+              },
+            ]}
           >
-            {item.title}
+            {item.anime?.rating || item.rating || "N/A"}
           </Text>
-
-          <View
-            style={{ flexDirection: "row", alignItems: "center", marginTop: 4 }}
-          >
-            <Star size={14} color="#FFD700" fill="#FFD700" />
-            <Text style={{ color: colors.text, fontSize: 12, marginLeft: 4 }}>
-              {item.rating}
-            </Text>
-          </View>
-
-          <Text
-            style={{ color: colors.textSecondary, fontSize: 12, marginTop: 4 }}
-          >
-            Added: {new Date(item.addedDate).toLocaleDateString()}
-          </Text>
-
-          {item.genres && item.genres.length > 0 && (
-            <View
-              style={{ flexDirection: "row", flexWrap: "wrap", marginTop: 4 }}
-            >
-              {item.genres.slice(0, 2).map((genre) => (
-                <View
-                  key={genre}
-                  style={{
-                    backgroundColor: colors.cardHover,
-                    borderRadius: 12,
-                    paddingHorizontal: 8,
-                    paddingVertical: 2,
-                    marginRight: 4,
-                    marginTop: 4,
-                  }}
-                >
-                  <Text style={{ color: colors.textSecondary, fontSize: 10 }}>
-                    {genre}
-                  </Text>
-                </View>
-              ))}
-              {item.genres.length > 2 && (
-                <View
-                  style={{
-                    backgroundColor: colors.cardHover,
-                    borderRadius: 12,
-                    paddingHorizontal: 8,
-                    paddingVertical: 2,
-                    marginTop: 4,
-                  }}
-                >
-                  <Text style={{ color: colors.textSecondary, fontSize: 10 }}>
-                    +{item.genres.length - 2}
-                  </Text>
-                </View>
-              )}
-            </View>
-          )}
         </View>
 
-        <View style={{ flexDirection: "row", marginTop: 8 }}>
-          <TouchableOpacity
-            style={{
-              flexDirection: "row",
-              alignItems: "center",
-              backgroundColor: colors.cardHover,
-              borderRadius: 4,
-              paddingHorizontal: 8,
-              paddingVertical: 4,
-              marginRight: 8,
-            }}
-            onPress={() => handleAddToList(item, "Watchlist")}
-          >
-            <BookmarkIcon size={12} color={colors.warning} />
-            <Text style={{ color: colors.text, fontSize: 10, marginLeft: 4 }}>
-              Watchlist
-            </Text>
-          </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.favoriteButton}
+          onPress={() => handleRemoveFromFavorites(item.anime_id || item.id)}
+        >
+          <Heart size={16} color={colors.error} fill={colors.error} />
+        </TouchableOpacity>
 
-          <TouchableOpacity
-            style={{
-              flexDirection: "row",
-              alignItems: "center",
-              backgroundColor: colors.cardHover,
-              borderRadius: 4,
-              paddingHorizontal: 8,
-              paddingVertical: 4,
-            }}
-            onPress={() => handleAddToList(item, "Watching")}
-          >
-            <Eye size={12} color={colors.primary} />
-            <Text style={{ color: colors.text, fontSize: 10, marginLeft: 4 }}>
-              Watch
-            </Text>
-          </TouchableOpacity>
-        </View>
+        <TouchableOpacity
+          style={styles.optionsButton}
+          onPress={() => handleAnimeOptions(item.anime_id || item.id)}
+        >
+          <MoreVertical size={16} color={colors.textSecondary} />
+        </TouchableOpacity>
       </View>
-
-      <TouchableOpacity
-        style={{ padding: 8 }}
-        onPress={() => handleRemoveFromFavorites(item)}
-        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-      >
-        <Trash2 size={18} color={colors.error} />
-      </TouchableOpacity>
     </TouchableOpacity>
   );
 
-  // Render empty state
-  const renderEmptyComponent = () => {
-    if (loading) {
-      return (
-        <View
-          style={{
-            flex: 1,
-            alignItems: "center",
-            justifyContent: "center",
-            paddingVertical: 80,
-          }}
-        >
+  return (
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+      <Header
+        title="Favorites"
+        showSearch
+        showNotifications
+        onSearchPress={() => router.push('/search')}
+        onNotificationsPress={() => router.push('/notifications')}
+      />
+
+      {loading ? (
+        <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={colors.primary} />
-          <Text style={{ color: colors.textSecondary, marginTop: 16 }}>
-            Loading favorites...
+          <Text style={[styles.loadingText, { color: colors.text }]}>
+            Loading your favorites...
           </Text>
         </View>
-      );
-    }
-
-    return (
-      <View
-        style={{
-          flex: 1,
-          alignItems: "center",
-          justifyContent: "center",
-          paddingVertical: 80,
-        }}
-      >
-        <View
-          style={{
-            width: 64,
-            height: 64,
-            borderRadius: 32,
-            backgroundColor: colors.cardHover,
-            alignItems: "center",
-            justifyContent: "center",
-            marginBottom: 16,
-          }}
-        >
-          <Heart size={32} color={colors.error} />
-        </View>
-        <Text
-          style={{
-            color: colors.text,
-            fontSize: 18,
-            fontWeight: "600",
-            marginBottom: 8,
-          }}
-        >
-          No favorites yet
-        </Text>
-        <Text
-          style={{
-            color: colors.textSecondary,
-            textAlign: "center",
-            paddingHorizontal: 32,
-          }}
-        >
-          Start adding anime to your favorites to see them here
-        </Text>
-        <TouchableOpacity
-          style={{
-            backgroundColor: colors.primary,
-            paddingHorizontal: 16,
-            paddingVertical: 8,
-            borderRadius: 8,
-            marginTop: 16,
-          }}
-          onPress={() => router.push("/")}
-        >
-          <Text style={{ color: "#FFFFFF" }}>Browse Anime</Text>
-        </TouchableOpacity>
-      </View>
-    );
-  };
-
-  return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
-      <StatusBar
-        barStyle={isDarkMode ? "light-content" : "dark-content"}
-        backgroundColor={colors.background}
-      />
-      <View style={{ flex: 1 }}>
-        {/* Header */}
-        <View
-          style={{
-            width: "100%",
-            height: 60,
-            backgroundColor: colors.background,
-            flexDirection: "row",
-            alignItems: "center",
-            justifyContent: "space-between",
-            paddingHorizontal: 16,
-            borderBottomWidth: 1,
-            borderBottomColor: colors.border,
-          }}
-        >
-          <TouchableOpacity onPress={handleBackPress}>
-            <ArrowLeft size={24} color={colors.text} />
-          </TouchableOpacity>
-          <Text
-            style={{ color: colors.text, fontWeight: "bold", fontSize: 18 }}
-          >
-            Favorites
+      ) : error ? (
+        <View style={styles.errorContainer}>
+          <Text style={[styles.errorText, { color: colors.error }]}>
+            Error loading your favorites
           </Text>
           <TouchableOpacity
-            onPress={() => Alert.alert("Info", "These are your favorite anime")}
+            style={[styles.retryButton, { backgroundColor: colors.primary }]}
+            onPress={handleRefresh}
           >
-            <Info size={24} color={colors.text} />
+            <Text style={styles.retryButtonText}>Retry</Text>
           </TouchableOpacity>
         </View>
-
-        {/* Favorites List */}
+      ) : lists.favorites.length === 0 ? (
+        <View style={styles.emptyContainer}>
+          <Text style={[styles.emptyTitle, { color: colors.text }]}>
+            No favorites yet
+          </Text>
+          <Text style={[styles.emptySubtitle, { color: colors.textSecondary }]}>
+            Add anime to your favorites to see them here
+          </Text>
+          <TouchableOpacity
+            style={[styles.exploreButton, { backgroundColor: colors.primary }]}
+            onPress={() => router.push('/')}
+          >
+            <Text style={styles.exploreButtonText}>Explore Anime</Text>
+          </TouchableOpacity>
+        </View>
+      ) : (
         <FlatList
-          data={favorites}
+          data={lists.favorites}
           renderItem={renderAnimeItem}
-          keyExtractor={(item) => item.id}
-          contentContainerStyle={{
-            flexGrow: 1,
-            padding: 16,
-            paddingBottom: 80, // Add padding for bottom navigation
-          }}
-          ListEmptyComponent={renderEmptyComponent}
-          onRefresh={fetchFavorites}
-          refreshing={loading}
+          keyExtractor={(item) => (item.anime_id || item.id).toString()}
+          contentContainerStyle={styles.listContent}
+          numColumns={2}
+          showsVerticalScrollIndicator={false}
+          columnWrapperStyle={styles.columnWrapper}
+          onRefresh={handleRefresh}
+          refreshing={refreshing}
         />
-
-        <BottomNavigation
-          currentRoute="/favorites"
-          activeTab={activeTab}
-          onTabChange={setActiveTab}
-        />
-      </View>
+      )}
     </SafeAreaView>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
+  listContent: {
+    padding: 16,
+    paddingBottom: 100, // Extra padding for bottom navigation
+  },
+  columnWrapper: {
+    justifyContent: 'space-between',
+  },
+  animeItem: {
+    width: '48%',
+    marginBottom: 16,
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  animeImage: {
+    width: '100%',
+    aspectRatio: 0.7,
+    borderTopLeftRadius: 12,
+    borderTopRightRadius: 12,
+  },
+  animeDetails: {
+    padding: 12,
+    borderBottomLeftRadius: 12,
+    borderBottomRightRadius: 12,
+    position: 'relative',
+  },
+  animeTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  ratingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  ratingText: {
+    fontSize: 12,
+  },
+  favoriteButton: {
+    position: 'absolute',
+    bottom: 8,
+    right: 8,
+    padding: 4,
+  },
+  optionsButton: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    padding: 4,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 16,
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 16,
+  },
+  errorText: {
+    fontSize: 16,
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  retryButton: {
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 8,
+  },
+  retryButtonText: {
+    color: '#FFFFFF',
+    fontWeight: '600',
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 16,
+  },
+  emptyTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  emptySubtitle: {
+    fontSize: 14,
+    marginBottom: 24,
+    textAlign: 'center',
+  },
+  exploreButton: {
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 8,
+  },
+  exploreButtonText: {
+    color: '#FFFFFF',
+    fontWeight: '600',
+  },
+});

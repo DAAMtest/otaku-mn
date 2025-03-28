@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -9,23 +9,31 @@ import {
   TextInput,
   ScrollView,
   Alert,
+  ActivityIndicator,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { ArrowLeft, Save, Camera } from "lucide-react-native";
 import { useTheme } from "@/context/ThemeProvider";
+import { useSupabaseAuth } from "@/hooks/useSupabaseAuth";
 
 export default function EditProfileScreen() {
   const router = useRouter();
   const { colors, isDarkMode } = useTheme();
-
-  // Mock user data - in a real app, this would come from a database or context
-  const [username, setUsername] = useState("AnimeUser");
-  const [bio, setBio] = useState(
-    "Anime enthusiast from Mongolia. I love shonen and slice of life anime!",
-  );
-  const [avatarUrl, setAvatarUrl] = useState(
-    "https://api.dicebear.com/7.x/avataaars/svg?seed=AnimeUser",
-  );
+  const { user, updateProfile, loading: authLoading } = useSupabaseAuth();
+  
+  const [loading, setLoading] = useState(false);
+  const [username, setUsername] = useState("");
+  const [bio, setBio] = useState("");
+  const [avatarUrl, setAvatarUrl] = useState("");
+  
+  // Initialize form with user data when available
+  useEffect(() => {
+    if (user) {
+      setUsername(user.username || "");
+      setBio(user.bio || "");
+      setAvatarUrl(user.avatarUrl || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.username || "user"}`);
+    }
+  }, [user]);
 
   // Handle back button press
   const handleBackPress = () => {
@@ -33,27 +41,94 @@ export default function EditProfileScreen() {
   };
 
   // Handle save profile
-  const handleSaveProfile = () => {
-    // In a real app, this would update the user profile in a database
-    Alert.alert(
-      "Profile Updated",
-      "Your profile has been updated successfully",
-      [
-        {
-          text: "OK",
-          onPress: () => router.back(),
-        },
-      ],
-    );
+  const handleSaveProfile = async () => {
+    if (!username.trim()) {
+      Alert.alert("Error", "Username cannot be empty");
+      return;
+    }
+    
+    try {
+      setLoading(true);
+      
+      const { success, error } = await updateProfile({
+        username,
+        bio,
+        avatar_url: avatarUrl,
+      });
+      
+      if (!success) throw error;
+      
+      Alert.alert(
+        "Profile Updated",
+        "Your profile has been updated successfully",
+        [
+          {
+            text: "OK",
+            onPress: () => router.back(),
+          },
+        ],
+      );
+    } catch (error) {
+      console.error("Error updating profile:", error);
+      Alert.alert("Error", "Failed to update profile. Please try again.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   // Handle avatar change
   const handleAvatarChange = () => {
-    // In a real app, this would open the image picker
+    // Generate a new random avatar using DiceBear
     const newSeed = Math.random().toString(36).substring(7);
     setAvatarUrl(`https://api.dicebear.com/7.x/avataaars/svg?seed=${newSeed}`);
     Alert.alert("Avatar Changed", "Your avatar has been updated");
   };
+  
+  // Show loading state while auth is loading
+  if (authLoading) {
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
+        <StatusBar
+          barStyle={isDarkMode ? "light-content" : "dark-content"}
+          backgroundColor={colors.background}
+        />
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+          <ActivityIndicator size="large" color={colors.primary} />
+          <Text style={{ color: colors.text, marginTop: 16 }}>Loading profile data...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+  
+  // Redirect to login if not authenticated
+  if (!user) {
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
+        <StatusBar
+          barStyle={isDarkMode ? "light-content" : "dark-content"}
+          backgroundColor={colors.background}
+        />
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 }}>
+          <Text style={{ color: colors.text, fontSize: 18, marginBottom: 20, textAlign: 'center' }}>
+            Please sign in to edit your profile
+          </Text>
+          <TouchableOpacity
+            style={{
+              backgroundColor: colors.primary,
+              borderRadius: 8,
+              paddingHorizontal: 20,
+              paddingVertical: 12,
+            }}
+            onPress={() => router.push("/auth/login")}
+          >
+            <Text style={{ color: "#FFFFFF", fontWeight: "bold" }}>
+              Go to Login
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
@@ -84,8 +159,12 @@ export default function EditProfileScreen() {
           >
             Edit Profile
           </Text>
-          <TouchableOpacity onPress={handleSaveProfile}>
-            <Save size={24} color={colors.primary} />
+          <TouchableOpacity onPress={handleSaveProfile} disabled={loading}>
+            {loading ? (
+              <ActivityIndicator size="small" color={colors.primary} />
+            ) : (
+              <Save size={24} color={colors.primary} />
+            )}
           </TouchableOpacity>
         </View>
 
@@ -143,6 +222,7 @@ export default function EditProfileScreen() {
                 borderColor: colors.border,
               }}
               placeholderTextColor={colors.textSecondary}
+              placeholder="Enter your username"
             />
           </View>
 
@@ -172,6 +252,7 @@ export default function EditProfileScreen() {
                 minHeight: 100,
               }}
               placeholderTextColor={colors.textSecondary}
+              placeholder="Tell us about yourself..."
             />
           </View>
 
@@ -183,12 +264,23 @@ export default function EditProfileScreen() {
               padding: 16,
               alignItems: "center",
               marginTop: 16,
+              opacity: loading ? 0.7 : 1,
             }}
             onPress={handleSaveProfile}
+            disabled={loading}
           >
-            <Text style={{ color: "#FFFFFF", fontWeight: "bold" }}>
-              Save Changes
-            </Text>
+            {loading ? (
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <ActivityIndicator size="small" color="#FFFFFF" />
+                <Text style={{ color: "#FFFFFF", fontWeight: "bold", marginLeft: 8 }}>
+                  Saving...
+                </Text>
+              </View>
+            ) : (
+              <Text style={{ color: "#FFFFFF", fontWeight: "bold" }}>
+                Save Changes
+              </Text>
+            )}
           </TouchableOpacity>
         </ScrollView>
       </View>

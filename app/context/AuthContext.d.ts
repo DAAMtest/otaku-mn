@@ -1,4 +1,4 @@
-import { User } from '@supabase/supabase-js';
+import { User, Session } from '@supabase/supabase-js';
 import { ReactNode } from 'react';
 
 export interface AuthContextType {

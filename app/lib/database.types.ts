@@ -19,6 +19,9 @@ export interface Database {
           release_date: string | null;
           created_at: string;
           updated_at: string;
+          anime_genres: {
+            genres: { name: string }[]
+          }[];
         };
         Insert: {
           id?: string;
@@ -29,6 +32,9 @@ export interface Database {
           release_date?: string | null;
           created_at?: string;
           updated_at?: string;
+          anime_genres?: {
+            genres: { name: string }[]
+          }[];
         };
         Update: {
           id?: string;
@@ -39,6 +45,9 @@ export interface Database {
           release_date?: string | null;
           created_at?: string;
           updated_at?: string;
+          anime_genres?: {
+            genres: { name: string }[]
+          }[];
         };
       };
       anime_genres: {
@@ -90,30 +99,24 @@ export interface Database {
           user_id: string;
           anime_id: string;
           list_type: string;
-          progress: number | null;
+          progress: number;
           added_date: string;
-          created_at: string;
-          updated_at: string;
         };
         Insert: {
           id?: string;
           user_id: string;
           anime_id: string;
           list_type: string;
-          progress?: number | null;
+          progress: number;
           added_date?: string;
-          created_at?: string;
-          updated_at?: string;
         };
         Update: {
           id?: string;
           user_id?: string;
           anime_id?: string;
           list_type?: string;
-          progress?: number | null;
+          progress?: number;
           added_date?: string;
-          created_at?: string;
-          updated_at?: string;
         };
       };
       users: {

@@ -17,6 +17,7 @@ import Button from "@/components/Button";
 import VideoThumbnail from "@/components/VideoThumbnail";
 import Badge from "@/components/Badge";
 import { supabase } from "@/lib/supabase";
+import "./_layout";
 import {
   ChevronLeft,
   Heart,
@@ -28,6 +29,8 @@ import {
   Info,
   Play,
 } from "lucide-react-native";
+import { PostgrestResponse, PostgrestSingleResponse } from "@supabase/supabase-js";
+import { Database } from '@/types/database';
 
 type UUID = string;
 
@@ -61,11 +64,26 @@ interface Episode {
   progress?: number;
 }
 
+interface RelatedAnimeRecord {
+  relation_type: string;
+  related_anime_id: UUID;
+  anime: {
+    id: UUID;
+    title: string;
+    image_url: string | null;
+  } | null;
+}
+
 interface RelatedAnime {
   id: UUID;
   title: string;
-  imageUrl?: string;
-  relation: string; // e.g., "sequel", "prequel", "side_story"
+  imageUrl: string;
+  relation: string;
+}
+
+interface WatchProgress {
+  episode_id: string;
+  progress: number;
 }
 
 /**
@@ -82,14 +100,16 @@ export default function AnimeDetailsScreen() {
   const [error, setError] = useState<string | null>(null);
   const [isFavorite, setIsFavorite] = useState(false);
   const [isInWatchlist, setIsInWatchlist] = useState(false);
-  const [activeTab, setActiveTab] = useState<"episodes" | "related">(
-    "episodes",
-  );
+  const [activeTab, setActiveTab] = useState<"episodes" | "related">("episodes");
 
   // Fetch anime details
   useEffect(() => {
+    let isMounted = true; // Flag to track if component is mounted
+    
     const fetchAnimeData = async () => {
       try {
+        if (!isMounted) return; // Don't proceed if component unmounted
+        
         setLoading(true);
         setError(null);
 
@@ -124,7 +144,7 @@ export default function AnimeDetailsScreen() {
 
         if (animeError) throw animeError;
 
-        if (animeData) {
+        if (animeData && isMounted) { // Check if component is still mounted
           // Format anime details
           const formattedAnime: AnimeDetails = {
             id: animeData.id,
@@ -137,13 +157,18 @@ export default function AnimeDetailsScreen() {
             releaseYear: animeData.release_year,
             season: animeData.season,
             status: animeData.status,
-            rating: animeData.rating,
+            rating: animeData.rating || 0,
             popularity: animeData.popularity,
-            genres:
-              animeData.anime_genres?.map((g: any) => g.genres.name) || [],
+            genres: animeData.anime_genres?.map((ag: any) => 
+              ag.genres && typeof ag.genres === 'object' 
+                ? ag.genres.name 
+                : null
+            ).filter(Boolean) || [],
+            episodes: [],
+            relatedAnime: [],
           };
 
-          // Fetch episodes for this anime
+          // Fetch episodes
           const { data: episodesData, error: episodesError } = await supabase
             .from("episodes")
             .select("*")
@@ -152,111 +177,114 @@ export default function AnimeDetailsScreen() {
 
           if (episodesError) throw episodesError;
 
-          if (episodesData && episodesData.length > 0) {
-            // Format episodes data
-            formattedAnime.episodes = episodesData.map((ep) => ({
+          if (episodesData && isMounted) { // Check if component is still mounted
+            // Format episodes
+            formattedAnime.episodes = episodesData.map((ep: any) => ({
               id: ep.id,
-              title: `Episode ${ep.episode_number}: ${ep.title}`,
+              title: ep.title,
               description: ep.description || "",
-              thumbnailUri: ep.thumbnail_url || animeData.image_url,
-              videoUri:
-                ep.video_url ||
-                "https://d23dyxeqlo5psv.cloudfront.net/big_buck_bunny.mp4",
-              duration: ep.duration || "24:00",
+              thumbnailUri: ep.thumbnail_url || formattedAnime.imageUrl || "",
+              videoUri: ep.video_url || "",
+              duration: ep.duration || "Unknown",
               episodeNumber: ep.episode_number,
               watched: false,
               progress: 0,
             }));
-          } else {
-            // If no episodes found in database, show empty state
-            formattedAnime.episodes = [];
           }
 
-          // Fetch related anime
-          const { data: relatedData, error: relatedError } = await supabase
-            .from("anime_relations")
-            .select(
-              `
-              relation_type,
-              related_anime_id,
-              related_anime:related_anime_id(id, title, image_url)
-            `,
-            )
-            .eq("anime_id", animeId);
+          // Fetch related anime - using anime_relations table instead of related_anime
+          try {
+            const { data: relatedData, error: relatedError } = await supabase
+              .from("anime_relations")
+              .select("*")
+              .eq("anime_id", animeId);
 
-          if (!relatedError && relatedData && relatedData.length > 0) {
-            formattedAnime.relatedAnime = relatedData.map((relation) => ({
-              id: relation.related_anime.id,
-              title: relation.related_anime.title,
-              imageUrl: relation.related_anime.image_url,
-              relation: relation.relation_type,
-            }));
-          } else {
-            // If no related anime found, show empty state
+            if (relatedError) throw relatedError;
+
+            if (relatedData && relatedData.length > 0 && isMounted) {
+              // Get the related anime IDs
+              const relatedAnimeIds = relatedData.map((item: { related_anime_id: string }) => item.related_anime_id);
+              
+              // Fetch the actual anime details for these IDs
+              const { data: relatedAnimeData, error: relatedAnimeError } = await supabase
+                .from("anime")
+                .select("id, title, image_url")
+                .in("id", relatedAnimeIds);
+                
+              if (relatedAnimeError) throw relatedAnimeError;
+              
+              if (relatedAnimeData && isMounted) {
+                // Create a map of anime details by ID for quick lookup
+                const animeDetailsMap = new Map<string, { id: string; title: string; image_url: string | null }>();
+                relatedAnimeData.forEach((anime: { id: string; title: string; image_url: string | null }) => {
+                  animeDetailsMap.set(anime.id, anime);
+                });
+                
+                // Format related anime by combining relation type with anime details
+                formattedAnime.relatedAnime = relatedData
+                  .filter((relation: { related_anime_id: string }) => animeDetailsMap.has(relation.related_anime_id))
+                  .map((relation: { related_anime_id: string; relation_type: string }) => {
+                    const anime = animeDetailsMap.get(relation.related_anime_id)!;
+                    return {
+                      id: anime.id,
+                      title: anime.title,
+                      imageUrl: anime.image_url || "",
+                      relation: relation.relation_type,
+                    };
+                  });
+              }
+            } else {
+              formattedAnime.relatedAnime = [];
+            }
+          } catch (error) {
+            console.log("Error fetching related anime:", error);
             formattedAnime.relatedAnime = [];
           }
 
-          setAnimeDetails(formattedAnime);
-
-          // Check if anime is in user's favorites
-          if (user) {
-            const { data: favData } = await supabase
-              .from("user_favorites")
-              .select("*")
+          // Check if anime is in user's lists
+          if (user && isMounted) { // Check if component is still mounted
+            const { data: listData, error: listError } = await supabase
+              .from("user_anime_lists")
+              .select("list_type")
               .eq("user_id", user.id)
-              .eq("anime_id", animeId)
-              .single();
+              .eq("anime_id", animeId);
 
-            setIsFavorite(!!favData);
+            if (!listError && listData) {
+              const inWatchlist = listData.some(
+                (item: any) => item.list_type === "watchlist",
+              );
+              const inFavorites = listData.some(
+                (item: any) => item.list_type === "favorites",
+              );
 
-            // Check if anime is in user's watchlist
-            const { data: watchlistData } = await supabase
-              .from("user_watchlist")
-              .select("*")
-              .eq("user_id", user.id)
-              .eq("anime_id", animeId)
-              .single();
-
-            setIsInWatchlist(!!watchlistData);
-
-            // Get watch progress for episodes if user is logged in
-            if (formattedAnime.episodes && formattedAnime.episodes.length > 0) {
-              const { data: progressData } = await supabase
-                .from("watch_history")
-                .select("*")
-                .eq("user_id", user.id)
-                .eq("anime_id", animeId);
-
-              if (progressData && progressData.length > 0) {
-                const updatedEpisodes = formattedAnime.episodes.map(
-                  (episode) => {
-                    const progress = progressData.find(
-                      (p) => p.episode_id === episode.id,
-                    );
-                    if (progress) {
-                      return {
-                        ...episode,
-                        watched: true,
-                        progress: progress.progress || 0,
-                      };
-                    }
-                    return episode;
-                  },
-                );
-                formattedAnime.episodes = updatedEpisodes;
+              if (isMounted) { // Check if component is still mounted
+                setIsInWatchlist(inWatchlist);
+                setIsFavorite(inFavorites);
               }
             }
           }
+
+          // Set anime details
+          if (isMounted) { // Check if component is still mounted
+            setAnimeDetails(formattedAnime);
+            setLoading(false);
+          }
         }
-      } catch (err) {
-        console.error("Error fetching anime data:", err);
-        setError("Failed to load anime data. Please try again later.");
-      } finally {
-        setLoading(false);
+      } catch (err: any) {
+        console.error("Error fetching anime details:", err);
+        if (isMounted) { // Check if component is still mounted
+          setError(err.message || "Failed to load anime details");
+          setLoading(false);
+        }
       }
     };
 
     fetchAnimeData();
+
+    // Cleanup function to set isMounted to false when component unmounts
+    return () => {
+      isMounted = false;
+    };
   }, [animeId, user]);
 
   // Toggle favorite status
@@ -346,74 +374,312 @@ export default function AnimeDetailsScreen() {
     });
   };
 
+  // Render anime details
+  const renderAnimeDetails = () => {
+    if (!animeDetails) return null;
+
+    return (
+      <View style={styles.detailsContainer}>
+        <View style={styles.headerSection}>
+          <View style={styles.titleContainer}>
+            <Typography variant="h1" style={styles.title}>
+              {animeDetails.title}
+            </Typography>
+            {animeDetails.releaseYear && (
+              <Typography variant="body" style={styles.year}>
+                ({animeDetails.releaseYear})
+              </Typography>
+            )}
+          </View>
+
+          <View style={styles.statsContainer}>
+            {animeDetails.rating && (
+              <View style={styles.statItem}>
+                <Star size={16} color={colors.primary} />
+                <Typography variant="body" style={styles.statText}>
+                  {animeDetails.rating.toFixed(1)}
+                </Typography>
+              </View>
+            )}
+            {animeDetails.releaseDate && (
+              <View style={styles.statItem}>
+                <Calendar size={16} color={colors.primary} />
+                <Typography variant="body" style={styles.statText}>
+                  {animeDetails.releaseDate}
+                </Typography>
+              </View>
+            )}
+            {animeDetails.status && (
+              <View style={styles.statItem}>
+                <Info size={16} color={colors.primary} />
+                <Typography variant="body" style={styles.statText}>
+                  {animeDetails.status}
+                </Typography>
+              </View>
+            )}
+          </View>
+
+          <View style={styles.genreContainer}>
+            {animeDetails.genres?.map((genre, index) => (
+              <Badge key={index} label={genre} />
+            ))}
+          </View>
+        </View>
+
+        <View style={styles.actionButtonsContainer}>
+          <TouchableOpacity
+            style={[
+              styles.actionButton,
+              { backgroundColor: colors.background },
+            ]}
+            onPress={toggleFavorite}
+          >
+            <Heart
+              size={20}
+              color={isFavorite ? "#FF6B6B" : colors.text}
+              fill={isFavorite ? "#FF6B6B" : "transparent"}
+            />
+            <Typography
+              variant="button"
+              style={[styles.actionButtonText, { color: colors.text }]}
+            >
+              {isFavorite ? "Favorited" : "Favorite"}
+            </Typography>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[
+              styles.actionButton,
+              { backgroundColor: colors.background },
+            ]}
+            onPress={toggleWatchlist}
+          >
+            <BookmarkPlus
+              size={20}
+              color={isInWatchlist ? "#4CAF50" : colors.text}
+              fill={isInWatchlist ? "#4CAF50" : "transparent"}
+            />
+            <Typography
+              variant="button"
+              style={[styles.actionButtonText, { color: colors.text }]}
+            >
+              {isInWatchlist ? "In Watchlist" : "Add to Watchlist"}
+            </Typography>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[
+              styles.actionButton,
+              { backgroundColor: colors.background },
+            ]}
+            onPress={() => {
+              // Handle download action
+              alert(
+                "This feature is coming soon!"
+              );
+            }}
+          >
+            <Download size={20} color={colors.text} />
+            <Typography
+              variant="button"
+              style={[styles.actionButtonText, { color: colors.text }]}
+            >
+              Download
+            </Typography>
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.descriptionContainer}>
+          <Typography variant="h2" style={styles.sectionTitle}>
+            Synopsis
+          </Typography>
+          <Typography variant="body" style={styles.description}>
+            {animeDetails.description}
+          </Typography>
+        </View>
+
+        {animeDetails.alternativeTitles && animeDetails.alternativeTitles.length > 0 && (
+          <View style={styles.infoSection}>
+            <Typography variant="h2" style={styles.sectionTitle}>
+              Alternative Titles
+            </Typography>
+            <Typography variant="body" style={styles.infoText}>
+              {animeDetails.alternativeTitles.join(", ")}
+            </Typography>
+          </View>
+        )}
+
+        {animeDetails.season && (
+          <View style={styles.infoSection}>
+            <Typography variant="h2" style={styles.sectionTitle}>
+              Season
+            </Typography>
+            <Typography variant="body" style={styles.infoText}>
+              {animeDetails.season}
+            </Typography>
+          </View>
+        )}
+
+        <View style={styles.tabContainer}>
+          <TouchableOpacity
+            style={[
+              styles.tabButton,
+              activeTab === "episodes" && styles.activeTabButton,
+            ]}
+            onPress={() => setActiveTab("episodes")}
+          >
+            <Typography
+              variant="button"
+              style={[
+                styles.tabButtonText,
+                activeTab === "episodes" && styles.activeTabButtonText,
+              ]}
+            >
+              Episodes
+            </Typography>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[
+              styles.tabButton,
+              activeTab === "related" && styles.activeTabButton,
+            ]}
+            onPress={() => setActiveTab("related")}
+          >
+            <Typography
+              variant="button"
+              style={[
+                styles.tabButtonText,
+                activeTab === "related" && styles.activeTabButtonText,
+              ]}
+            >
+              Related Anime
+            </Typography>
+          </TouchableOpacity>
+        </View>
+
+        {activeTab === "episodes" && renderEpisodes()}
+        {activeTab === "related" && renderRelatedAnime()}
+      </View>
+    );
+  };
+
+  // Render episodes
+  const renderEpisodes = () => {
+    if (!animeDetails || !animeDetails.episodes) return null;
+
+    return (
+      <View style={styles.episodesContainer}>
+        {animeDetails.episodes.map((episode) => (
+          <View key={episode.id} style={styles.episodeItem}>
+            <VideoThumbnail
+              title={episode.title}
+              episodeInfo={episode.description}
+              duration={episode.duration}
+              thumbnailUri={episode.thumbnailUri}
+              onPress={() => handleEpisodeSelect(episode)}
+            />
+            {episode.watched && (
+              <View
+                style={[
+                  styles.progressBar,
+                  { backgroundColor: colors.border },
+                ]}
+              >
+                <View
+                  style={[
+                    styles.progressFill,
+                    {
+                      width: `${episode.progress || 0}%`,
+                      backgroundColor: colors.primary,
+                    },
+                  ]}
+                />
+              </View>
+            )}
+          </View>
+        ))}
+      </View>
+    );
+  };
+
+  // Render related anime
+  const renderRelatedAnime = () => {
+    if (!animeDetails || !animeDetails.relatedAnime) return null;
+
+    return (
+      <View style={styles.relatedContainer}>
+        {animeDetails.relatedAnime.map((related) => (
+          <TouchableOpacity
+            key={related.id}
+            style={styles.relatedAnimeItem}
+            onPress={() => handleRelatedAnimeSelect(related.id)}
+          >
+            <Image
+              source={{ uri: related.imageUrl }}
+              style={styles.relatedAnimeImage}
+              resizeMode="cover"
+            />
+            <View style={styles.relatedAnimeInfo}>
+              <Typography variant="body" numberOfLines={2}>
+                {related.title}
+              </Typography>
+              <Badge
+                label={
+                  related.relation.charAt(0).toUpperCase() +
+                  related.relation.slice(1)
+                }
+                variant="default"
+                size="sm"
+                style={styles.relationBadge}
+              />
+            </View>
+          </TouchableOpacity>
+        ))}
+      </View>
+    );
+  };
+
   // Loading state
   if (loading) {
     return (
-      <SafeAreaView
-        style={[styles.container, { backgroundColor: colors.background }]}
-      >
-        <Stack.Screen options={{ headerShown: false }} />
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={colors.primary} />
-          <Typography
-            variant="body"
-            color={colors.textSecondary}
-            style={styles.loadingText}
-          >
-            Loading anime details...
-          </Typography>
-        </View>
-      </SafeAreaView>
+      <View style={[styles.container, { justifyContent: "center", alignItems: "center" }]}>
+        <ActivityIndicator size="large" color={colors.primary} />
+        <Typography variant="body" style={{ marginTop: 16, color: colors.text }}>
+          Loading anime details...
+        </Typography>
+      </View>
     );
   }
 
   // Error state
-  if (error || !animeDetails) {
+  if (error) {
     return (
-      <SafeAreaView
-        style={[styles.container, { backgroundColor: colors.background }]}
-      >
-        <Stack.Screen options={{ headerShown: false }} />
-        <View style={styles.errorContainer}>
-          <Typography
-            variant="h2"
-            color={colors.error}
-            style={styles.errorText}
-          >
-            {error || "Failed to load anime details"}
-          </Typography>
-          <Button
-            onPress={() => router.back()}
-            variant="primary"
-            label="Go Back"
-            style={styles.errorButton}
-          />
-        </View>
-      </SafeAreaView>
+      <View style={[styles.container, { justifyContent: "center", alignItems: "center", padding: 20 }]}>
+        <Typography variant="h2" style={{ textAlign: "center", marginBottom: 20, color: colors.error }}>
+          {error}
+        </Typography>
+        <Button
+          title="Try Again"
+          onPress={() => router.replace(`/anime/${animeId}`)}
+          style={{ minWidth: 120 }}
+        />
+      </View>
+    );
+  }
+
+  if (!animeDetails) {
+    return (
+      <View style={[styles.container, { justifyContent: "center", alignItems: "center" }]}>
+        <Typography variant="body" style={{ color: colors.text }}>
+          No anime details found
+        </Typography>
+      </View>
     );
   }
 
   return (
-    <SafeAreaView
-      style={[styles.container, { backgroundColor: colors.background }]}
-    >
-      <Stack.Screen
-        options={{
-          headerShown: false,
-        }}
-      />
-
+    <SafeAreaView style={styles.container}>
       <ScrollView style={styles.scrollView}>
-        {/* Back button */}
-        <View style={styles.backButtonContainer}>
-          <Button
-            onPress={() => router.back()}
-            variant="ghost"
-            leftIcon={<ChevronLeft size={20} color={colors.text} />}
-            label="Back"
-          />
-        </View>
-
         {/* Cover Image */}
         <View style={styles.coverImageContainer}>
           {animeDetails.coverImageUrl ? (
@@ -423,286 +689,74 @@ export default function AnimeDetailsScreen() {
               resizeMode="cover"
             />
           ) : (
-            <View
-              style={[
-                styles.coverImagePlaceholder,
-                { backgroundColor: colors.card },
-              ]}
-            />
+            <View style={[styles.coverImage, { backgroundColor: colors.background }]} />
           )}
-          <View style={styles.coverGradient} />
+          <View
+            style={[
+              styles.coverGradient,
+              { backgroundColor: "rgba(23, 23, 23, 0.8)" },
+            ]}
+          />
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={() => router.back()}
+          >
+            <ChevronLeft color={colors.text} size={24} />
+          </TouchableOpacity>
         </View>
 
-        {/* Anime Poster and Title Section */}
-        <View style={styles.posterSection}>
+        {/* Anime Info */}
+        <View style={styles.animeInfoContainer}>
           <View style={styles.posterContainer}>
             <Image
-              source={{
-                uri:
-                  animeDetails.imageUrl ||
-                  "https://images.unsplash.com/photo-1578632767115-351597cf2477?w=800&q=80",
-              }}
+              source={{ uri: animeDetails.imageUrl }}
               style={styles.posterImage}
               resizeMode="cover"
             />
           </View>
-
-          <View style={styles.titleContainer}>
-            <Typography
-              variant="h1"
-              color={colors.text}
-              weight="700"
-              numberOfLines={2}
-            >
+          <View style={styles.infoContainer}>
+            <Typography variant="h1" style={styles.title}>
               {animeDetails.title}
             </Typography>
-
-            {animeDetails.alternativeTitles &&
-              animeDetails.alternativeTitles.length > 0 && (
-                <Typography
-                  variant="bodySmall"
-                  color={colors.textSecondary}
-                  style={styles.altTitles}
-                >
-                  {animeDetails.alternativeTitles[0]}
-                </Typography>
-              )}
-
-            {/* Rating and Year */}
-            <View style={styles.metadataRow}>
+            <View style={styles.metaContainer}>
               {animeDetails.rating && (
-                <View style={styles.ratingContainer}>
-                  <Star
-                    size={16}
-                    color={colors.warning}
-                    fill={colors.warning}
-                  />
-                  <Typography
-                    variant="bodySmall"
-                    color={colors.text}
-                    weight="600"
-                    style={styles.ratingText}
-                  >
+                <View style={styles.metaItem}>
+                  <Star size={16} color="#FFD700" />
+                  <Typography variant="body" style={styles.metaText}>
                     {animeDetails.rating.toFixed(1)}
                   </Typography>
                 </View>
               )}
-
-              {animeDetails.releaseYear && (
-                <View style={styles.metadataItem}>
-                  <Calendar
-                    size={14}
-                    color={colors.textSecondary}
-                    style={styles.metadataIcon}
-                  />
-                  <Typography variant="bodySmall" color={colors.textSecondary}>
-                    {animeDetails.releaseYear}
+              {animeDetails.releaseDate && (
+                <View style={styles.metaItem}>
+                  <Calendar size={16} color={colors.primary} />
+                  <Typography variant="body" style={styles.metaText}>
+                    {animeDetails.releaseDate}
                   </Typography>
                 </View>
               )}
-
               {animeDetails.status && (
-                <View style={styles.metadataItem}>
-                  <Info
-                    size={14}
-                    color={colors.textSecondary}
-                    style={styles.metadataIcon}
-                  />
-                  <Typography variant="bodySmall" color={colors.textSecondary}>
+                <View style={styles.metaItem}>
+                  <Info size={16} color={colors.primary} />
+                  <Typography variant="body" style={styles.metaText}>
                     {animeDetails.status}
                   </Typography>
                 </View>
               )}
             </View>
-
-            {/* Genres */}
-            {animeDetails.genres && animeDetails.genres.length > 0 && (
-              <View style={styles.genresContainer}>
-                {animeDetails.genres.map((genre, index) => (
-                  <Badge
-                    key={index}
-                    label={genre}
-                    variant="secondary"
-                    style={styles.genreBadge}
-                  />
-                ))}
-              </View>
-            )}
-          </View>
-        </View>
-
-        {/* Action Buttons */}
-        <View style={styles.actionButtonsContainer}>
-          <Button
-            onPress={startWatching}
-            variant="primary"
-            label="Watch Now"
-            leftIcon={<Play size={18} color="white" />}
-            style={styles.watchButton}
-          />
-
-          <View style={styles.secondaryActions}>
-            <TouchableOpacity
-              onPress={toggleFavorite}
-              style={[styles.iconButton, isFavorite && styles.activeIconButton]}
-            >
-              <Heart
-                size={22}
-                color={isFavorite ? colors.error : colors.text}
-                fill={isFavorite ? colors.error : "transparent"}
-              />
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              onPress={toggleWatchlist}
-              style={[
-                styles.iconButton,
-                isInWatchlist && styles.activeIconButton,
-              ]}
-            >
-              <BookmarkPlus
-                size={22}
-                color={isInWatchlist ? colors.primary : colors.text}
-                fill={isInWatchlist ? colors.primary : "transparent"}
-              />
-            </TouchableOpacity>
-
-            <TouchableOpacity style={styles.iconButton}>
-              <Download size={22} color={colors.text} />
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        {/* Synopsis */}
-        <View style={styles.synopsisContainer}>
-          <Typography
-            variant="h2"
-            color={colors.text}
-            weight="600"
-            style={styles.sectionTitle}
-          >
-            Synopsis
-          </Typography>
-          <Typography
-            variant="body"
-            color={colors.textSecondary}
-            style={styles.synopsis}
-          >
-            {animeDetails.description}
-          </Typography>
-        </View>
-
-        {/* Tabs for Episodes and Related */}
-        <View style={styles.tabsContainer}>
-          <TouchableOpacity
-            style={[styles.tab, activeTab === "episodes" && styles.activeTab]}
-            onPress={() => setActiveTab("episodes")}
-          >
-            <Typography
-              variant="bodyLarge"
-              color={
-                activeTab === "episodes" ? colors.primary : colors.textSecondary
-              }
-              weight={activeTab === "episodes" ? "600" : "400"}
-            >
-              Episodes
-            </Typography>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.tab, activeTab === "related" && styles.activeTab]}
-            onPress={() => setActiveTab("related")}
-          >
-            <Typography
-              variant="bodyLarge"
-              color={
-                activeTab === "related" ? colors.primary : colors.textSecondary
-              }
-              weight={activeTab === "related" ? "600" : "400"}
-            >
-              Related
-            </Typography>
-          </TouchableOpacity>
-        </View>
-
-        {/* Episodes List */}
-        {activeTab === "episodes" && animeDetails.episodes && (
-          <View style={styles.episodesContainer}>
-            {animeDetails.episodes.map((episode) => (
-              <View key={episode.id} style={styles.episodeItem}>
-                <VideoThumbnail
-                  title={episode.title}
-                  episodeInfo={episode.description}
-                  duration={episode.duration}
-                  thumbnailUri={episode.thumbnailUri}
-                  onPress={() => handleEpisodeSelect(episode)}
-                />
-                {episode.watched && (
-                  <View
-                    style={[
-                      styles.progressBar,
-                      { backgroundColor: colors.border },
-                    ]}
-                  >
-                    <View
-                      style={[
-                        styles.progressFill,
-                        {
-                          width: `${episode.progress || 0}%`,
-                          backgroundColor: colors.primary,
-                        },
-                      ]}
-                    />
-                  </View>
-                )}
-              </View>
-            ))}
-          </View>
-        )}
-
-        {/* Related Anime */}
-        {activeTab === "related" && animeDetails.relatedAnime && (
-          <View style={styles.relatedContainer}>
-            {animeDetails.relatedAnime.map((related) => (
-              <TouchableOpacity
-                key={related.id}
-                style={styles.relatedAnimeItem}
-                onPress={() => handleRelatedAnimeSelect(related.id)}
-              >
-                <Image
-                  source={{
-                    uri:
-                      related.imageUrl ||
-                      "https://images.unsplash.com/photo-1578632767115-351597cf2477?w=800&q=80",
-                  }}
-                  style={styles.relatedAnimeImage}
-                  resizeMode="cover"
-                />
-                <View style={styles.relatedAnimeInfo}>
-                  <Typography
-                    variant="bodySmall"
-                    color={colors.text}
-                    weight="500"
-                    numberOfLines={2}
-                  >
-                    {related.title}
+            <View style={styles.genreContainer}>
+              {animeDetails.genres?.map((genre, index) => (
+                <View key={index} style={styles.genre}>
+                  <Typography variant="caption" style={styles.genreText}>
+                    {genre}
                   </Typography>
-                  <Badge
-                    label={
-                      related.relation.charAt(0).toUpperCase() +
-                      related.relation.slice(1)
-                    }
-                    variant="outline"
-                    style={styles.relationBadge}
-                  />
                 </View>
-              </TouchableOpacity>
-            ))}
+              ))}
+            </View>
           </View>
-        )}
+        </View>
 
-        {/* Bottom spacing */}
-        <View style={styles.bottomSpacing} />
+        {renderAnimeDetails()}
       </ScrollView>
     </SafeAreaView>
   );
@@ -713,15 +767,10 @@ const { width } = Dimensions.get("window");
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: "#171717",
   },
   scrollView: {
     flex: 1,
-  },
-  backButtonContainer: {
-    position: "absolute",
-    top: 16,
-    left: 16,
-    zIndex: 10,
   },
   coverImageContainer: {
     width: "100%",
@@ -732,127 +781,124 @@ const styles = StyleSheet.create({
     width: "100%",
     height: "100%",
   },
-  coverImagePlaceholder: {
-    width: "100%",
-    height: "100%",
-  },
   coverGradient: {
     position: "absolute",
     bottom: 0,
     left: 0,
     right: 0,
     height: 100,
-    backgroundColor: "rgba(0,0,0,0.5)",
   },
-  posterSection: {
-    flexDirection: "row",
+  backButton: {
+    position: "absolute",
+    top: 16,
+    left: 16,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 10,
+  },
+  favoriteButton: {
+    position: "absolute",
+    top: 16,
+    right: 16,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 10,
+  },
+  animeInfoContainer: {
+    marginTop: -50,
     padding: 16,
-    marginTop: -60,
+    flexDirection: "row",
   },
   posterContainer: {
     width: 120,
     height: 180,
     borderRadius: 8,
     overflow: "hidden",
-    elevation: 5,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
+    marginRight: 16,
+    borderWidth: 2,
+    borderColor: "#171717",
   },
   posterImage: {
     width: "100%",
     height: "100%",
   },
-  titleContainer: {
+  infoContainer: {
     flex: 1,
-    marginLeft: 16,
-    justifyContent: "flex-start",
+    justifyContent: "flex-end",
   },
-  altTitles: {
-    marginTop: 4,
+  title: {
+    fontSize: 24,
+    fontWeight: "bold",
+    color: "#FFFFFF",
+    marginBottom: 4,
   },
-  metadataRow: {
+  metaContainer: {
     flexDirection: "row",
-    alignItems: "center",
-    marginTop: 8,
     flexWrap: "wrap",
+    marginBottom: 8,
   },
-  ratingContainer: {
+  metaItem: {
     flexDirection: "row",
     alignItems: "center",
     marginRight: 12,
+    marginBottom: 4,
   },
-  ratingText: {
+  metaText: {
+    fontSize: 14,
+    color: "#CCCCCC",
     marginLeft: 4,
-  },
-  metadataItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginRight: 12,
-  },
-  metadataIcon: {
-    marginRight: 4,
   },
   genresContainer: {
     flexDirection: "row",
     flexWrap: "wrap",
-    marginTop: 8,
   },
-  genreBadge: {
+  genre: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    backgroundColor: "#333333",
+    borderRadius: 4,
     marginRight: 8,
     marginBottom: 8,
   },
-  actionButtonsContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 16,
-    marginTop: 8,
-    marginBottom: 16,
-  },
-  watchButton: {
-    flex: 1,
-  },
-  secondaryActions: {
-    flexDirection: "row",
-    marginLeft: 16,
-  },
-  iconButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    justifyContent: "center",
-    alignItems: "center",
-    marginLeft: 8,
-    backgroundColor: "rgba(0, 0, 0, 0.05)",
-  },
-  activeIconButton: {
-    backgroundColor: "rgba(0, 0, 0, 0.1)",
+  genreText: {
+    fontSize: 12,
+    color: "#FFFFFF",
   },
   synopsisContainer: {
     padding: 16,
-    paddingTop: 0,
   },
   sectionTitle: {
+    fontSize: 18,
+    fontWeight: "bold",
+    color: "#FFFFFF",
     marginBottom: 8,
   },
   synopsis: {
-    lineHeight: 22,
+    fontSize: 14,
+    color: "#CCCCCC",
+    lineHeight: 20,
   },
   tabsContainer: {
     flexDirection: "row",
     borderBottomWidth: 1,
-    borderBottomColor: "rgba(0, 0, 0, 0.1)",
-    marginTop: 16,
+    borderBottomColor: "#333333",
+    marginHorizontal: 16,
   },
   tab: {
-    flex: 1,
     paddingVertical: 12,
-    alignItems: "center",
+    marginRight: 16,
   },
   activeTab: {
     borderBottomWidth: 2,
-    borderBottomColor: "#6200ee",
+    borderBottomColor: "#6200EE",
   },
   episodesContainer: {
     padding: 16,
@@ -861,14 +907,14 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   progressBar: {
-    height: 3,
+    height: 4,
     width: "100%",
-    borderRadius: 1.5,
+    borderRadius: 2,
     marginTop: 4,
   },
   progressFill: {
     height: "100%",
-    borderRadius: 1.5,
+    borderRadius: 2,
   },
   relatedContainer: {
     padding: 16,
@@ -877,44 +923,112 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
   },
   relatedAnimeItem: {
-    width: (width - 48) / 2,
+    width: width / 2 - 24,
     marginBottom: 16,
+    borderRadius: 8,
+    overflow: "hidden",
+    backgroundColor: "#333333",
   },
   relatedAnimeImage: {
     width: "100%",
-    height: 120,
-    borderRadius: 8,
+    aspectRatio: 0.7,
   },
   relatedAnimeInfo: {
-    marginTop: 8,
+    padding: 8,
   },
   relationBadge: {
     marginTop: 4,
-    alignSelf: "flex-start",
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    padding: 20,
-  },
-  loadingText: {
-    marginTop: 16,
-  },
-  errorContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    padding: 20,
-  },
-  errorText: {
-    textAlign: "center",
-    marginBottom: 20,
-  },
-  errorButton: {
-    minWidth: 120,
   },
   bottomSpacing: {
     height: 40,
+  },
+  // New styles for the improved UI
+  detailsContainer: {
+    padding: 16,
+  },
+  headerSection: {
+    marginBottom: 16,
+  },
+  titleContainer: {
+    flex: 1,
+  },
+  year: {
+    fontSize: 16,
+    color: "#666",
+    marginLeft: 8,
+  },
+  statsContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 8,
+  },
+  statItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginRight: 16,
+  },
+  statText: {
+    fontSize: 14,
+    marginLeft: 4,
+  },
+  genreContainer: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    marginTop: 8,
+  },
+  actionButtonsContainer: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginTop: 16,
+    marginBottom: 16,
+  },
+  actionButton: {
+    flex: 1,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: "center",
+    alignItems: "center",
+    flexDirection: "row",
+    marginHorizontal: 4,
+  },
+  actionButtonText: {
+    fontSize: 12,
+    marginLeft: 4,
+  },
+  descriptionContainer: {
+    marginTop: 16,
+  },
+  description: {
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  infoSection: {
+    marginTop: 16,
+  },
+  infoText: {
+    fontSize: 14,
+  },
+  tabContainer: {
+    flexDirection: "row",
+    marginTop: 24,
+    marginBottom: 16,
+  },
+  tabButton: {
+    flex: 1,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: "center",
+    alignItems: "center",
+    marginHorizontal: 4,
+  },
+  tabButtonText: {
+    fontSize: 14,
+  },
+  activeTabButton: {
+    backgroundColor: "#6200ee",
+  },
+  activeTabButtonText: {
+    color: "#fff",
   },
 });

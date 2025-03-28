@@ -14,146 +14,105 @@ import BottomNavigation from "./components/BottomNavigation";
 import FilterBar from "./components/FilterBar";
 import useAnimeData from "./hooks/useAnimeData";
 import { useAuth } from "./context/AuthContext";
-import useAnimeLists from "./hooks/useAnimeLists";
+import { Anime } from "./hooks/useAnimeSearch";
+import { ListType, useAnimeLists } from "./hooks/useAnimeLists";
 import AuthModal from "./auth/components/AuthModal";
-import type { Database } from "@/lib/database.types";
 
-// Define the Anime type to match AnimeGrid's expected type
-type Tables = Database["public"]["Tables"];
-type AnimeGridItem = Tables["anime"]["Row"] & {
-  is_favorite?: boolean;
-  genres?: string[];
-  type?: string;
-};
+interface FilterOption {
+  id: string;
+  label: string;
+  icon: string;
+}
 
-export default function TrendingScreen() {
+const TrendingScreen = () => {
   const router = useRouter();
   const { user, isLoading } = useAuth();
   const { trendingAnime, loading, error, fetchTrendingAnime } = useAnimeData();
-  const { addToList } = useAnimeLists(user?.id || null);
+  const { addToList, moveToList } = useAnimeLists(user?.id || null);
 
-  const [activeTab, setActiveTab] = useState("home");
-  const [showAuthModal, setShowAuthModal] = useState(false);
-  const [selectedGenres, setSelectedGenres] = useState<string[]>([]);
-  const [filteredAnime, setFilteredAnime] = useState<AnimeGridItem[]>([]);
-  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
+  const [animeList, setAnimeList] = useState<Anime[]>([]);
+  const [isLoadingState, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [selectedFilters, setSelectedFilters] = useState<string[]>([]);
 
-  // Fetch trending anime on component mount
-  useEffect(() => {
-    fetchTrendingAnime();
-  }, [fetchTrendingAnime]);
+  const filterOptions: FilterOption[] = [
+    { id: "all", label: "All", icon: "tag" },
+    { id: "today", label: "Today", icon: "calendar" },
+    { id: "this-week", label: "This Week", icon: "calendar" },
+    { id: "this-month", label: "This Month", icon: "calendar" },
+    { id: "this-year", label: "This Year", icon: "calendar" },
+  ];
 
-  // Update filtered anime when trendingAnime, selectedGenres, or sortOrder changes
-  useEffect(() => {
-    // Convert trendingAnime to AnimeGridItem format
-    const convertedAnime: AnimeGridItem[] = trendingAnime.map(anime => ({
-      id: anime.id,
-      title: anime.title,
-      image_url: anime.imageUrl,
-      rating: anime.rating || null,
-      description: anime.description || null,
-      release_date: anime.releaseDate || null,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-      is_favorite: anime.isFavorite,
-      type: anime.type
-    }));
-    
-    let result = [...convertedAnime];
-
-    // Apply genre filters if any are selected
-    if (selectedGenres.length > 0) {
-      result = result.filter((anime) =>
-        anime.genres?.some((genre: string) => selectedGenres.includes(genre)),
-      );
-    }
-
-    // Apply filters
-    if (selectedFilters.length > 0) {
-      result = result.filter((anime) =>
-        selectedFilters.includes("All") || (anime.type && selectedFilters.includes(anime.type))
-      );
-    }
-
-    // Apply sorting
-    result.sort((a, b) => {
-      if (sortOrder === "asc") {
-        return (a.rating || 0) - (b.rating || 0);
-      } else {
-        return (b.rating || 0) - (a.rating || 0);
-      }
-    });
-
-    setFilteredAnime(result);
-  }, [trendingAnime, selectedGenres, selectedFilters, sortOrder]);
-
-  // Handle back button press
-  const handleBackPress = () => {
-    router.back();
-  };
-
-  // Handle filter change
-  const handleFilterChange = (filters: string[]) => {
-    setSelectedGenres(filters);
-  };
-
-  // Handle sort change
-  const handleSortChange = (order: "asc" | "desc") => {
-    setSortOrder(order);
-  };
-
-  // Handle anime press
-  const handleAnimePress = (anime: AnimeGridItem) => {
-    Alert.alert("Anime Details", `Viewing details for ${anime.title}`);
-  };
-
-  // Handle favorite toggle
-  const handleFavorite = (anime: AnimeGridItem) => {
-    if (!user) {
-      setShowAuthModal(true);
-      return;
-    }
-
-    Alert.alert(
-      "Favorites",
-      `${anime.is_favorite ? "Remove from" : "Add to"} favorites?`,
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Confirm",
-          onPress: async () => {
-            // Toggle favorite status
-            console.log(`Toggled favorite status for ${anime.id}`);
-          },
-        },
-      ],
+  const handleFilterPress = (option: FilterOption) => {
+    setSelectedFilters((prev) =>
+      prev.includes(option.id)
+        ? prev.filter((id) => id !== option.id)
+        : [...prev, option.id]
     );
   };
 
-  // Handle add to list
-  const handleAddToList = (anime: AnimeGridItem) => {
-    if (!user) {
-      setShowAuthModal(true);
-      return;
-    }
+  const loadAnime = async () => {
+    try {
+      const data = await fetchTrendingAnime();
 
-    Alert.alert("Add to List", `Add "${anime.title}" to your list`, [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Watchlist",
-        onPress: () => addToList(anime.id, "watchlist"),
-      },
-      {
-        text: "Currently Watching",
-        onPress: () => addToList(anime.id, "watching"),
-      },
-      {
-        text: "Completed",
-        onPress: () => addToList(anime.id, "completed"),
-      },
-    ]);
+      if (Array.isArray(data) && data.length > 0) {
+        const formattedAnime = data.map((item: Anime) => ({
+          id: item.id,
+          title: item.title,
+          imageUrl: item.imageUrl,
+          rating: item.rating || 0,
+          description: item.description,
+          releaseDate: item.releaseDate,
+          genres: item.genres || [],
+          isFavorite: item.isFavorite || false,
+        }));
+
+        setAnimeList(formattedAnime);
+      } else if (!Array.isArray(data)) {
+        console.error("Error: fetchTrendingAnime returned a non-array value");
+      } else if (data.length === 0) {
+        console.log("No trending anime found");
+      }
+    } catch (error) {
+      console.error("Error loading anime:", error);
+    } finally {
+      setIsLoading(false);
+      setIsRefreshing(false);
+    }
   };
+
+  const handleAddToList = async (anime: Anime) => {
+    if (!user) return;
+
+    try {
+      await addToList(anime.id, "watchlist");
+
+      Alert.alert("Success", `"${anime.title}" added to watchlist`);
+    } catch (error) {
+      console.error("Error adding to list:", error);
+      Alert.alert("Error", "Failed to add anime to watchlist");
+    }
+  };
+
+  const handleFavorite = async (anime: Anime) => {
+    if (!user) return;
+
+    try {
+      const currentList = anime.isFavorite ? "favorites" : "watchlist";
+      const targetList = anime.isFavorite ? "watchlist" : "favorites";
+      
+      await moveToList(anime.id, currentList, targetList);
+
+      Alert.alert("Success", `"${anime.title}" added to favorites`);
+    } catch (error) {
+      console.error("Error adding to favorites:", error);
+      Alert.alert("Error", "Failed to add anime to favorites");
+    }
+  };
+
+  useEffect(() => {
+    loadAnime();
+  }, []);
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: "#171717" }}>
@@ -168,7 +127,7 @@ export default function TrendingScreen() {
           }}
         >
           <TouchableOpacity
-            onPress={handleBackPress}
+            onPress={() => router.back()}
             style={{
               width: 40,
               height: 40,
@@ -196,26 +155,24 @@ export default function TrendingScreen() {
         </View>
 
         <FilterBar
-          filters={["All", "Today", "This Week", "This Month", "This Year"]}
-          selectedFilters={selectedFilters}
-          onFilterPress={(filter) => {
-            // Toggle the filter in the selectedFilters array
-            if (selectedFilters.includes(filter)) {
-              setSelectedFilters(selectedFilters.filter(f => f !== filter));
-            } else {
-              setSelectedFilters([...selectedFilters, filter]);
-            }
-          }}
+          options={filterOptions}
+          selectedOptions={selectedFilters}
+          onOptionPress={handleFilterPress}
           isLoading={loading.trending}
         />
 
         <View style={{ flex: 1, paddingBottom: 70 }}>
           <AnimeGrid
-            data={filteredAnime}
-            loading={loading.trending}
-            refreshing={loading.trending}
-            onRefresh={fetchTrendingAnime}
-            onAnimePress={handleAnimePress}
+            anime={animeList}
+            isLoading={isLoadingState}
+            isRefreshing={isRefreshing}
+            onRefresh={loadAnime}
+            onPress={(anime: Anime) => {
+              router.push({
+                pathname: `/anime/${anime.id}`,
+                params: { animeId: anime.id },
+              });
+            }}
             onAddToList={handleAddToList}
             onFavorite={handleFavorite}
             numColumns={2}
@@ -224,17 +181,19 @@ export default function TrendingScreen() {
 
         <BottomNavigation
           currentRoute="/trending"
-          activeTab={activeTab}
-          onTabChange={setActiveTab}
+          activeTab="home"
+          onTabChange={() => {}}
         />
 
-        {showAuthModal && (
+        {false && (
           <AuthModal
-            visible={showAuthModal}
-            onClose={() => setShowAuthModal(false)}
+            visible={false}
+            onClose={() => {}}
           />
         )}
       </View>
     </SafeAreaView>
   );
-}
+};
+
+export default TrendingScreen;

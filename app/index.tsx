@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
-import { View, SafeAreaView, StatusBar, Alert, Platform } from "react-native";
+import { View, SafeAreaView, StatusBar, Alert, Platform, Text, StyleSheet } from "react-native";
 import { useRouter, usePathname } from "expo-router";
 import Header from "@/components/Header";
 import FilterBar from "@/components/FilterBar";
@@ -8,11 +8,29 @@ import AuthModal from "@/auth/components/AuthModal";
 import MenuDrawer from "@/components/MenuDrawer";
 import { useAuth } from "@/context/AuthContext";
 import type { Database } from "@/lib/database.types";
-import BottomNavigation from "@/components/BottomNavigation";
 import useAnimeData from "@/hooks/useAnimeData";
 import { Anime } from "@/hooks/useAnimeSearch";
+import { supabase } from "@/lib/supabase";
 
-export default function HomeScreen() {
+interface FilterOption {
+  id: string;
+  label: string;
+  icon: string;
+}
+
+interface FilterBarProps {
+  options: FilterOption[];
+  selectedOptions: string[];
+  onOptionPress: (option: FilterOption) => void;
+}
+
+interface AuthModalProps {
+  visible: boolean;
+  onClose: () => void;
+  onLogin: () => Promise<void>;
+}
+
+const HomeScreen = () => {
   const router = useRouter();
   const pathname = usePathname();
   const [showAuthModal, setShowAuthModal] = useState(false);
@@ -23,6 +41,11 @@ export default function HomeScreen() {
   const [currentSortOrder, setCurrentSortOrder] = useState<"asc" | "desc">(
     "desc",
   );
+  const [animeList, setAnimeList] = useState<Anime[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [topAnime, setTopAnime] = useState<Anime[]>([]);
+  const { user } = useAuth();
 
   // Get anime data from the hook
   const {
@@ -37,15 +60,25 @@ export default function HomeScreen() {
   } = useAnimeData();
 
   // Define filter options based on fetched genres
-  const filterOptions = useMemo(
+  const filterOptions = useMemo<FilterOption[]>(
     () =>
       genres.map((genre) => ({
         id: genre.toLowerCase().replace(/\s+/g, "-"),
         label: genre,
-        value: genre,
+        icon: "tag",
       })),
-    [genres],
+    [genres]
   );
+
+  // Handle search button press
+  const handleSearchPress = () => {
+    router.push("/search");
+  };
+
+  // Handle notifications button press
+  const handleNotificationsPress = () => {
+    router.push("/notifications");
+  };
 
   // Get current route for bottom navigation
   const currentRoute = useMemo(() => {
@@ -55,9 +88,6 @@ export default function HomeScreen() {
     if (pathname.startsWith("/profile")) return "/profile";
     return "/";
   }, [pathname]);
-
-  // Use the trending anime as the main anime list
-  const [animeList, setAnimeList] = useState<Anime[]>([]);
 
   // Use useMemo for filtered and sorted anime list instead of state
   const filteredAnimeList = useMemo(() => {
@@ -72,16 +102,139 @@ export default function HomeScreen() {
 
     // Apply sorting
     return result.sort((a, b) => {
+      const aRating = a.rating ?? 0;
+      const bRating = b.rating ?? 0;
       if (currentSortOrder === "asc") {
-        return (a.rating ?? 0) - (b.rating ?? 0);
+        return aRating - bRating;
       } else {
-        return (b.rating ?? 0) - (a.rating ?? 0);
+        return bRating - aRating;
       }
     });
   }, [animeList, selectedGenres, currentSortOrder]);
 
-  // Use the loading state from the hook
-  const [isLoading, setIsLoading] = useState(true);
+  const loadAnime = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("anime")
+        .select(`
+          id,
+          title,
+          description,
+          image_url,
+          cover_image_url,
+          release_date,
+          rating,
+          anime_genres!inner(genres(name))
+        `)
+        .order("created_at", { ascending: false });
+
+      if (error) throw error;
+
+      if (data) {
+        const formattedData: Anime[] = (data || []).map((item: any) => ({
+          id: item.id,
+          title: item.title,
+          imageUrl: item.image_url,
+          rating: item.rating || 0,
+          description: item.description ?? "",
+          releaseDate: item.release_date ?? "",
+          genres: Array.isArray(item.anime_genres) 
+            ? item.anime_genres.map((ag: any) => 
+                ag.genres && typeof ag.genres === 'object' 
+                  ? ag.genres.name 
+                  : null
+              ).filter(Boolean)
+            : [],
+          isFavorite: false // Default to false since is_favorite doesn't exist
+        }));
+        setAnimeList(formattedData);
+      }
+    } catch (error) {
+      console.error("Error loading anime:", error);
+      Alert.alert("Error", "Failed to load anime list");
+    } finally {
+      setIsLoading(false);
+      setIsRefreshing(false);
+    }
+  };
+
+  // Use useEffect to fetch genres when component mounts
+  useEffect(() => {
+    const initializeData = async () => {
+      setIsLoading(true);
+      try {
+        await Promise.all([
+          loadAnime(),
+          fetchGenres()
+        ]);
+        console.log("Genres loaded:", genres);
+      } catch (error) {
+        console.error("Error initializing data:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    initializeData();
+  }, []);
+
+  // Add debug logging for filter options
+  useEffect(() => {
+    console.log("Filter options:", filterOptions);
+    console.log("Selected genres:", selectedGenres);
+  }, [filterOptions, selectedGenres]);
+
+  const handleAddToList = async (anime: Anime, listType: string) => {
+    if (!user) {
+      setShowAuthModal(true);
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from("user_anime_list")
+        .insert({
+          user_id: user.id,
+          anime_id: anime.id,
+          list_type: listType,
+          progress: 0
+        })
+        .select();
+
+      if (error) throw error;
+
+      Alert.alert("Success", "Anime added to your list!");
+    } catch (error) {
+      console.error("Error adding to list:", error);
+      Alert.alert("Error", "Failed to add anime to list");
+    }
+  };
+
+  const handleFavorite = async (anime: Anime) => {
+    if (!user) {
+      setShowAuthModal(true);
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from("user_anime_list")
+        .insert({
+          user_id: user.id,
+          anime_id: anime.id,
+          list_type: "favorites",
+          progress: 0
+        })
+        .select();
+
+      if (error) throw error;
+
+      Alert.alert("Success", "Anime added to favorites!");
+    } catch (error) {
+      console.error("Error adding to favorites:", error);
+      Alert.alert("Error", "Failed to add anime to favorites");
+    }
+  };
 
   // Handle user profile press
   const handleProfilePress = () => {
@@ -226,222 +379,81 @@ export default function HomeScreen() {
     [router],
   );
 
-  // Handle add to list
-  const handleAddToList = useCallback(
-    (anime: Anime) => {
-      if (!isAuthenticated) {
-        setShowAuthModal(true);
-        return;
-      }
-
-      Alert.alert("Add to List", `Add "${anime.title}" to your list`, [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Watchlist",
-          onPress: () => console.log(`Added ${anime.id} to watchlist`),
-        },
-        {
-          text: "Favorites",
-          onPress: () => console.log(`Added ${anime.id} to favorites`),
-        },
-        {
-          text: "Currently Watching",
-          onPress: () => console.log(`Added ${anime.id} to currently watching`),
-        },
-      ]);
-    },
-    [isAuthenticated],
-  );
-
-  // Handle favorite toggle
-  const handleFavorite = useCallback(
-    (anime: Anime) => {
-      if (!isAuthenticated) {
-        setShowAuthModal(true);
-        return;
-      }
-
-      setAnimeList((prevList) =>
-        prevList.map((item) =>
-          item.id === anime.id
-            ? { ...item, is_favorite: !item.is_favorite }
-            : item,
-        ),
-      );
-
-      const action = anime.is_favorite ? "removed from" : "added to";
-      Alert.alert("Favorites", `"${anime.title}" ${action} favorites`);
-    },
-    [isAuthenticated],
-  );
-
-  // Handle filter change
-  const handleFilterChange = (filters: string[]) => {
-    console.log("Filters changed:", filters);
-    setSelectedGenres(filters);
-  };
-
-  // Handle sort change
-  const handleSortChange = (sortOrder: "asc" | "desc") => {
-    console.log("Sort order changed:", sortOrder);
-    setCurrentSortOrder(sortOrder);
-  };
-
-  // Handle load more
-  const handleLoadMore = useCallback(() => {
-    if (!isLoading && filteredAnimeList.length >= 8) {
-      setIsLoading(true);
-      // Simulate loading more data
-      setTimeout(() => {
-        setIsLoading(false);
-        // Don't show "End of List" alert
-        // Add more anime to the list if needed
-      }, 1500);
-    }
-  }, [isLoading, filteredAnimeList.length]);
-
-  // Load data using the hook functions
-  const loadAllData = useCallback(async () => {
-    setIsLoading(true);
-    try {
-      // Fetch genres first
-      await fetchGenres();
-
-      // Fetch trending anime
-      await fetchTrendingAnime();
-
-      // Fetch new releases
-      await fetchNewReleases();
-    } catch (error) {
-      console.error("Error loading anime data:", error);
-      Alert.alert(
-        "Error",
-        "Failed to load anime data. Please try again later.",
-      );
-    } finally {
-      setIsLoading(false);
-    }
-  }, [fetchGenres, fetchTrendingAnime, fetchNewReleases]);
-
-  // Update animeList when trendingAnime changes
-  useEffect(() => {
-    if (trendingAnime.length > 0) {
-      // Convert the trending anime to the format expected by the UI
-      const formattedData = trendingAnime.map((anime) => ({
-        ...anime,
-        id: anime.id,
-        title: anime.title,
-        image_url: anime.imageUrl,
-        rating: anime.rating || 0,
-        is_favorite: anime.isFavorite || false,
-        description: anime.description || "",
-        release_date: anime.releaseDate,
-        genres: anime.genres || [],
-      }));
-
-      setAnimeList(formattedData);
-    }
-  }, [trendingAnime]);
-
-  // Load anime data on component mount
-  useEffect(() => {
-    loadAllData();
-  }, [loadAllData]);
-
-  // Handle refresh with pull-to-refresh gesture
-  const handleRefresh = useCallback(() => {
-    console.log("Refreshing anime list");
-
-    // Provide haptic feedback for refresh
-    try {
-      const Haptics = require("expo-haptics");
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    } catch (error) {
-      // Haptics not available, continue silently
-    }
-
-    // Fetch fresh data using our hook functions
-    loadAllData();
-  }, [loadAllData]);
-
-  // Handle search press
-  const handleSearchPress = () => {
-    router.push("/search");
-  };
-
-  // Handle filter button press
-  const handleFilterButtonPress = () => {
-    Alert.alert("Advanced Filters", "Select filters to apply", [
-      { text: "Cancel", style: "cancel" },
-      { text: "Apply", onPress: () => console.log("Applied advanced filters") },
-    ]);
-  };
-
-  const { user, isLoading: authLoading } = useAuth();
-
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: "#171717" }}>
-      <StatusBar barStyle="light-content" backgroundColor="#171717" />
-      <View style={{ flex: 1 }}>
-        <Header
-          title="AnimeTempo"
-          showBack={false}
-          showSearch={false}
-          showNotifications={true}
-          showMenu={false}
-          onNotificationsPress={() => handleMenuItemPress("notifications")}
-          notificationCount={3} // Example notification count
-        />
-        <FilterBar
-          filters={filterOptions.map((option) => option.value)}
-          selectedFilters={selectedGenres}
-          onFilterPress={(filter) => {
-            // Toggle the filter in the selectedGenres array
-            if (selectedGenres.includes(filter)) {
-              handleFilterChange(
-                selectedGenres.filter((genre) => genre !== filter),
-              );
-            } else {
-              handleFilterChange([...selectedGenres, filter]);
-            }
-          }}
-          isLoading={isLoading}
-        />
-        <View
-          style={{ flex: 1, paddingBottom: Platform.OS === "ios" ? 80 : 60 }}
-        >
-          <AnimeGrid
-            data={filteredAnimeList}
-            loading={isLoading}
-            refreshing={isLoading}
-            onRefresh={handleRefresh}
-            onEndReached={handleLoadMore}
-            onAnimePress={handleAnimePress}
-            onAddToList={handleAddToList}
-            onFavorite={handleFavorite}
-            numColumns={2}
-          />
-        </View>
-        {showAuthModal && (
-          <AuthModal
-            visible={showAuthModal}
-            onClose={() => setShowAuthModal(false)}
-          />
-        )}
-        <MenuDrawer
-          visible={showMenuDrawer}
-          onClose={() => setShowMenuDrawer(false)}
-          onMenuItemPress={handleMenuItemPress}
-          isAuthenticated={isAuthenticated}
-          username={username}
-          avatarUrl={
-            isAuthenticated
-              ? `https://api.dicebear.com/7.x/avataaars/svg?seed=${username}`
-              : undefined
-          }
-        />
-        <BottomNavigation currentRoute={currentRoute} />
-      </View>
+    <SafeAreaView style={styles.container}>
+      <Header
+        title="Home"
+        showSearch
+        showNotifications
+        onSearchPress={handleSearchPress}
+        onNotificationsPress={handleNotificationsPress}
+      />
+      
+      <FilterBar
+        options={filterOptions}
+        selectedOptions={selectedGenres}
+        onOptionPress={(option: FilterOption) => {
+          setSelectedGenres((prev) =>
+            prev.includes(option.id)
+              ? prev.filter((id) => id !== option.id)
+              : [...prev, option.id]
+          );
+        }}
+      />
+      
+      <AnimeGrid
+        anime={filteredAnimeList}
+        isLoading={isLoading}
+        isRefreshing={isRefreshing}
+        onRefresh={async () => {
+          setIsRefreshing(true);
+          await loadAnime();
+          setIsRefreshing(false);
+          return Promise.resolve();
+        }}
+        onPress={(anime) => {
+          router.push({
+            pathname: `/anime/${anime.id}`,
+            params: { animeId: anime.id },
+          });
+        }}
+        onAddToList={(anime) => handleAddToList(anime, "watchlist")}
+        onFavorite={(anime) => handleFavorite(anime)}
+        numColumns={2}
+      />
+      
+      <AuthModal
+        visible={showAuthModal}
+        onClose={() => setShowAuthModal(false)}
+        onLogin={async () => {
+          setShowAuthModal(false);
+          setIsAuthenticated(true);
+          setUsername(user?.user_metadata?.username || "Guest");
+          return Promise.resolve();
+        }}
+      />
+      
+      <MenuDrawer
+        visible={showMenuDrawer}
+        onClose={() => setShowMenuDrawer(false)}
+        onMenuItemPress={handleMenuItemPress}
+        isAuthenticated={isAuthenticated}
+        username={username}
+        avatarUrl={
+          isAuthenticated
+            ? `https://api.dicebear.com/7.x/avataaars/svg?seed=${username}`
+            : undefined
+        }
+      />
     </SafeAreaView>
   );
-}
+};
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: "#171717",
+  },
+});
+
+export default HomeScreen;

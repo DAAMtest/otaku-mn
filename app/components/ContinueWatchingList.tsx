@@ -132,7 +132,7 @@ const ContinueWatchingList = ({ onItemPress }: ContinueWatchingListProps) => {
             <View
               style={[
                 styles.progressBar,
-                { backgroundColor: colors.primary, width: progressWidth },
+                { backgroundColor: colors.primary, width: parseInt(progressWidth) },
               ]}
             />
           </View>
@@ -186,7 +186,7 @@ const ContinueWatchingList = ({ onItemPress }: ContinueWatchingListProps) => {
   return (
     <View style={styles.container}>
       <View style={styles.headerContainer}>
-        <Typography variant="bodyLarge" color={colors.text} weight="600">
+        <Typography variant="h3" color={colors.text} weight="600">
           Continue Watching
         </Typography>
       </View>

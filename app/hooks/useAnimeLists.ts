@@ -1,16 +1,41 @@
 import { useState, useEffect } from "react";
 import { supabase } from "../lib/supabase";
-import type { Database } from "@lib/database.types";
-import { UUID } from "./useAnimeSearch";
+import { Database } from '@/types/database';
+import { useQuery } from "react-query";
 
-export interface AnimeListItem {
-  id: UUID;
-  title: string;
-  imageUrl: string;
-  rating: number;
-  progress?: number;
-  addedDate: string;
-  genres?: string[];
+interface AnimeListItem {
+  id: string;
+  user_id: string;
+  anime_id: string;
+  list_type: string;
+  progress: number;
+  added_date: string;
+  anime: {
+    id: string;
+    title: string;
+    imageUrl: string;
+    description: string;
+    coverImageUrl: string;
+    releaseDate: string;
+    isFavorite?: boolean;
+  };
+  isFavorite?: boolean;
+}
+
+interface WatchHistoryItem {
+  id: string;
+  user_id: string;
+  anime_id: string;
+  watched_at: string;
+  created_at: string;
+  anime: {
+    id: string;
+    title: string;
+    imageUrl: string;
+    description: string;
+    coverImageUrl: string;
+    releaseDate: string;
+  };
 }
 
 export type ListType =
@@ -43,6 +68,62 @@ export function useAnimeLists(userId: string | null) {
     history: null,
   });
 
+  const { data: animeLists, error: queryError, isLoading } = useQuery(
+    ["animeLists", userId],
+    async () => {
+      if (!userId) return [];
+      const { data, error } = await supabase
+        .from("user_anime_lists")
+        .select("id, user_id, anime_id, list_type, progress, added_date, anime(id, title, imageUrl, description, coverImageUrl, releaseDate, isFavorite)")
+        .eq("user_id", userId);
+
+      if (error) throw error;
+      return data;
+    },
+    { enabled: !!userId }
+  );
+
+  useEffect(() => {
+    if (animeLists) {
+      const formattedLists: Record<ListType, AnimeListItem[]> = {
+        watching: [],
+        completed: [],
+        watchlist: [],
+        favorites: [],
+        history: [],
+      };
+
+      animeLists.forEach((item: AnimeListItem) => {
+        const listType = item.list_type;
+        const animeItem: AnimeListItem = {
+          id: item.id,
+          user_id: item.user_id,
+          anime_id: item.anime_id,
+          list_type: item.list_type,
+          progress: item.progress,
+          added_date: item.added_date,
+          anime: {
+            id: item.anime.id,
+            title: item.anime.title,
+            imageUrl: item.anime.imageUrl,
+            description: item.anime.description,
+            coverImageUrl: item.anime.coverImageUrl,
+            releaseDate: item.anime.releaseDate,
+            isFavorite: item.anime.isFavorite
+          }
+        };
+
+        if (listType === "watching") {
+          animeItem.isFavorite = false;
+        }
+
+        formattedLists[listType as ListType].push(animeItem);
+      });
+
+      setLists(formattedLists);
+    }
+  }, [animeLists]);
+
   // Fetch user's anime lists
   const fetchList = async (listType: ListType) => {
     if (!userId) return;
@@ -55,24 +136,27 @@ export function useAnimeLists(userId: string | null) {
         // For history, we use the watch_history table
         const { data, error: historyError } = await supabase
           .from("watch_history")
-          .select(
-            `
+          .select(`
             id,
+            user_id,
+            anime_id,
             watched_at,
-            anime:anime_id(id, title, image_url, rating)
-          `,
-          )
+            created_at,
+            anime:anime_id(id, title, imageUrl, description, coverImageUrl, releaseDate)
+          `)
           .eq("user_id", userId)
           .order("watched_at", { ascending: false });
 
         if (historyError) throw historyError;
 
-        const formattedData = (data || []).map((item) => ({
+        const formattedData = (data || []).map((item: WatchHistoryItem) => ({
           id: item.anime.id,
           title: item.anime.title,
-          imageUrl: item.anime.image_url,
-          rating: item.anime.rating || 0,
-          addedDate: item.watched_at,
+          imageUrl: item.anime.imageUrl,
+          description: item.anime.description,
+          coverImageUrl: item.anime.coverImageUrl,
+          releaseDate: item.anime.releaseDate,
+          watched_at: item.watched_at
         }));
 
         setLists((prev) => ({ ...prev, [listType]: formattedData }));
@@ -80,27 +164,30 @@ export function useAnimeLists(userId: string | null) {
         // For other lists, we use the user_anime_lists table
         const { data, error: listsError } = await supabase
           .from("user_anime_lists")
-          .select(
-            `
+          .select(`
             id,
+            user_id,
+            anime_id,
+            list_type,
             progress,
             added_date,
-            anime:anime_id(id, title, image_url, rating)
-          `,
-          )
+            anime:anime_id(id, title, imageUrl, description, coverImageUrl, releaseDate)
+          `)
           .eq("user_id", userId)
           .eq("list_type", listType)
           .order("added_date", { ascending: false });
 
         if (listsError) throw listsError;
 
-        const formattedData = (data || []).map((item) => ({
+        const formattedData = (data || []).map((item: AnimeListItem) => ({
           id: item.anime.id,
           title: item.anime.title,
-          imageUrl: item.anime.image_url,
-          rating: item.anime.rating || 0,
+          imageUrl: item.anime.imageUrl,
+          description: item.anime.description,
+          coverImageUrl: item.anime.coverImageUrl,
+          releaseDate: item.anime.releaseDate,
           progress: item.progress,
-          addedDate: item.added_date,
+          added_date: item.added_date
         }));
 
         setLists((prev) => ({ ...prev, [listType]: formattedData }));
@@ -115,7 +202,7 @@ export function useAnimeLists(userId: string | null) {
 
   // Add anime to a list
   const addToList = async (
-    animeId: UUID,
+    animeId: string,
     listType: ListType,
     progress: number = 0,
   ) => {
@@ -185,7 +272,7 @@ export function useAnimeLists(userId: string | null) {
   };
 
   // Remove anime from a list
-  const removeFromList = async (animeId: UUID, listType: ListType) => {
+  const removeFromList = async (animeId: string, listType: ListType) => {
     if (!userId) return { error: new Error("User not authenticated") };
 
     try {
@@ -220,7 +307,7 @@ export function useAnimeLists(userId: string | null) {
   };
 
   // Update progress for a watching anime
-  const updateProgress = async (animeId: UUID, progress: number) => {
+  const updateProgress = async (animeId: string, progress: number) => {
     if (!userId) return { error: new Error("User not authenticated") };
 
     try {
@@ -247,7 +334,7 @@ export function useAnimeLists(userId: string | null) {
 
   // Move anime from one list to another
   const moveToList = async (
-    animeId: UUID,
+    animeId: string,
     fromList: ListType,
     toList: ListType,
     progress: number = 0,

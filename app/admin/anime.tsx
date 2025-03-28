@@ -11,6 +11,7 @@ import {
   Alert,
   ActivityIndicator,
   Modal,
+  ScrollView,
 } from "react-native";
 import { useRouter } from "expo-router";
 import {
@@ -106,7 +107,7 @@ export default function AnimeManagement() {
 
       if (error) throw error;
 
-      const formattedData = data.map((item) => ({
+      const formattedData = data.map((item: any) => ({
         ...item,
         genres: item.anime_genres?.map((g: any) => g.genres.name) || [],
       }));

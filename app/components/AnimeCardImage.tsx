@@ -25,9 +25,9 @@ const AnimeCardImage = ({
 
   // Size configurations
   const sizeStyles = {
-    small: { width: 100, height: 150, borderRadius: 6 },
-    medium: { width: 140, height: 200, borderRadius: 8 },
-    large: { width: "100%", height: 220, borderRadius: 10 },
+    small: { width: 100, height: 150, borderRadius: 6 } as const,
+    medium: { width: 140, height: 200, borderRadius: 8 } as const,
+    large: { width: 100, height: 220, borderRadius: 10 } as const,
   };
 
   const currentSize = sizeStyles[size];

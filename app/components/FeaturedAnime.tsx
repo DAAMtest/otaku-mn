@@ -9,7 +9,8 @@ import type { Database } from "@/lib/database.types";
 import { Anime, UUID } from "@/hooks/useAnimeSearch";
 
 interface FeaturedAnimeItem extends Anime {
-  genres?: string[];
+  progress?: number;
+  added_date?: string;
 }
 
 interface FeaturedAnimeProps {
@@ -51,57 +52,57 @@ const FeaturedAnime = React.memo(function FeaturedAnime({
 }: FeaturedAnimeProps) {
   return (
     <TouchableOpacity
-      className="h-[200px] mx-4 mb-6 rounded-xl overflow-hidden"
+      className="h-[220px] mx-2 mb-6 rounded-xl overflow-hidden"
       onPress={() => onPress?.(anime)}
       activeOpacity={0.9}
     >
       <ImageBackground
-        source={{ uri: anime.image_url }}
+        source={{ uri: anime.imageUrl }}
         className="w-full h-full justify-end"
         resizeMode="cover"
       >
         <LinearGradient
           colors={["transparent", "rgba(0,0,0,0.8)", "rgba(0,0,0,0.9)"]}
-          className="p-4 pt-12"
+          className="p-5 pt-16"
         >
-          <View className="flex-row items-center mb-1">
+          <View className="flex-row items-center mb-2">
             {anime.rating && (
-              <>
+              <View className="flex-row items-center bg-black/50 rounded-full px-2 py-1 mr-3">
                 <Star size={14} className="text-amber-500" fill="#f59e0b" />
-                <Text className="text-white text-xs ml-1 mr-3">
+                <Text className="text-white text-xs ml-1 font-medium">
                   {anime.rating}
                 </Text>
-              </>
+              </View>
             )}
             {anime.genres && <GenreTags genres={anime.genres} />}
           </View>
 
-          <Text className="text-white font-bold text-xl mb-1">
+          <Text className="text-white font-bold text-xl mb-2">
             {anime.title}
           </Text>
 
           {anime.description && (
-            <Text className="text-gray-300 text-xs" numberOfLines={2}>
+            <Text className="text-gray-300 text-xs mb-3" numberOfLines={2}>
               {anime.description}
             </Text>
           )}
 
-          <View className="flex-row mt-3">
+          <View className="flex-row mt-2">
             <TouchableOpacity
-              className="bg-indigo-600 dark:bg-indigo-500 flex-row items-center rounded-full px-4 py-1.5 mr-3"
+              className="bg-indigo-600 dark:bg-indigo-500 flex-row items-center rounded-full px-4 py-2 mr-3"
               onPress={() => onPlayPress?.(anime)}
               activeOpacity={0.8}
             >
               <Play size={16} className="text-white" />
-              <Text className="text-white text-xs font-medium ml-1">
+              <Text className="text-white text-sm font-medium ml-1">
                 Watch Now
               </Text>
             </TouchableOpacity>
 
             <TouchableOpacity
               className={cn(
-                "flex-row items-center rounded-full px-4 py-1.5",
-                anime.is_favorite
+                "flex-row items-center rounded-full px-4 py-2",
+                anime.isFavorite
                   ? "bg-indigo-700 dark:bg-indigo-600"
                   : "bg-neutral-800 dark:bg-neutral-700",
               )}
@@ -109,8 +110,8 @@ const FeaturedAnime = React.memo(function FeaturedAnime({
               activeOpacity={0.8}
             >
               <Plus size={16} className="text-white" />
-              <Text className="text-white text-xs font-medium ml-1">
-                {anime.is_favorite ? "In My List" : "Add to List"}
+              <Text className="text-white text-sm font-medium ml-1">
+                {anime.isFavorite ? "In My List" : "Add to List"}
               </Text>
             </TouchableOpacity>
           </View>

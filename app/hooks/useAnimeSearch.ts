@@ -6,15 +6,14 @@ import type { Database } from "@lib/database.types";
 export type UUID = string;
 
 export interface Anime {
-  id: UUID;
+  id: string;
   title: string;
   imageUrl: string;
   rating: number;
+  description: string;
+  releaseDate: string;
+  genres: string[];
   isFavorite: boolean;
-  genres?: string[];
-  description?: string;
-  releaseDate?: string;
-  type?: string;
 }
 
 export function useAnimeSearch(userId: string | null) {
@@ -35,43 +34,45 @@ export function useAnimeSearch(userId: string | null) {
       setError(null);
 
       try {
-        let animeQuery = supabase.from("anime").select(`
-          id,
-          title,
-          image_url,
-          rating,
-          description,
-          release_date,
-          anime_genres!inner(genres(name))
-        `);
+        let animeQuery = supabase
+          .from("anime")
+          .select(
+            "id, title, image_url: imageUrl, rating, description, release_date: releaseDate, anime_genres!inner(genres(name))"
+          );
 
         // Add title search if query is provided
-        if (query) {
+        if (query.trim()) {
           animeQuery = animeQuery.ilike("title", `%${query}%`);
         }
 
-        // Add genre filter if genres are selected
+        // Add genre filters if any are selected
         if (selectedGenres.length > 0) {
-          animeQuery = animeQuery.in(
-            "anime_genres.genres.name",
-            selectedGenres,
-          );
+          animeQuery = animeQuery
+            .in("anime_genres.genres.name", selectedGenres)
+            .order("rating", { ascending: false });
+        } else {
+          animeQuery = animeQuery.order("rating", { ascending: false });
         }
 
-        // Order by rating descending by default
-        animeQuery = animeQuery.order("rating", { ascending: false });
+        const { data, error } = await animeQuery.limit(20);
 
-        const { data, error: searchError } = await animeQuery;
+        if (error) throw error;
 
-        if (searchError) throw searchError;
+        const formattedAnime = (data || []).map((item: any) => ({
+          id: item.id,
+          title: item.title,
+          imageUrl: item.imageUrl,
+          rating: item.rating || 0,
+          description: item.description,
+          releaseDate: item.releaseDate,
+          genres: item.anime_genres?.map((g: any) => g.genres.name) || [],
+          isFavorite: false,
+        }));
 
-        // Format the data
-        const formattedData = await formatAnimeData(data || [], userId);
-        setSearchResults(formattedData);
+        setSearchResults(formattedAnime);
       } catch (err) {
         console.error("Error searching anime:", err);
         setError(err as Error);
-        setSearchResults([]);
       } finally {
         setLoading(false);
       }
@@ -88,114 +89,41 @@ export function useAnimeSearch(userId: string | null) {
     };
   }
 
-  // Fetch popular anime (highest rated)
-  const fetchPopularAnime = async () => {
+  // Fetch popular anime
+  const fetchPopularAnime = useCallback(async () => {
     setLoading(true);
     setError(null);
 
     try {
-      const { data, error: fetchError } = await supabase
+      const { data, error } = await supabase
         .from("anime")
         .select(
-          `
-          id,
-          title,
-          image_url,
-          rating,
-          description,
-          release_date,
-          anime_genres(genres(name))
-        `,
+          "id, title, image_url: imageUrl, rating, description, release_date: releaseDate, anime_genres!inner(genres(name))"
         )
         .order("rating", { ascending: false })
         .limit(10);
 
-      if (fetchError) throw fetchError;
+      if (error) throw error;
 
-      // Format the data
-      const formattedData = await formatAnimeData(data || [], userId);
-      setPopularAnime(formattedData);
+      const formattedAnime = (data || []).map((item: any) => ({
+        id: item.id,
+        title: item.title,
+        imageUrl: item.imageUrl,
+        rating: item.rating || 0,
+        description: item.description,
+        releaseDate: item.releaseDate,
+        genres: item.anime_genres?.map((g: any) => g.genres.name) || [],
+        isFavorite: false,
+      }));
+
+      setPopularAnime(formattedAnime);
     } catch (err) {
       console.error("Error fetching popular anime:", err);
       setError(err as Error);
-      setPopularAnime([]);
     } finally {
       setLoading(false);
     }
-  };
-
-  // Helper function to format anime data and check favorites
-  const formatAnimeData = async (
-    data: any[],
-    userId: string | null,
-  ): Promise<Anime[]> => {
-    // If no user is logged in, just format the data without checking favorites
-    if (!userId || !data || data.length === 0) {
-      return (data || []).map((item) => ({
-        id: item.id,
-        title: item.title,
-        imageUrl: item.image_url,
-        rating: item.rating || 0,
-        isFavorite: false,
-        genres: item.anime_genres?.map((g: any) => g.genres.name) || [],
-        description: item.description,
-        releaseDate: item.release_date,
-      }));
-    }
-
-    try {
-      // Get user's favorites to check against
-      const { data: favoritesData, error: favoritesError } = await supabase
-        .from("user_anime_lists")
-        .select("anime_id")
-        .eq("user_id", userId)
-        .eq("list_type", "favorites");
-
-      if (favoritesError) {
-        console.error("Error fetching favorites:", favoritesError);
-        // Continue without favorites data
-        return data.map((item) => ({
-          id: item.id,
-          title: item.title,
-          imageUrl: item.image_url,
-          rating: item.rating || 0,
-          isFavorite: false,
-          genres: item.anime_genres?.map((g: any) => g.genres.name) || [],
-          description: item.description,
-          releaseDate: item.release_date,
-        }));
-      }
-
-      // Create a set of favorite anime IDs for quick lookup
-      const favoriteIds = new Set(
-        (favoritesData || []).map((fav) => fav.anime_id),
-      );
-
-      // Format the data with favorite status
-      return data.map((item) => ({
-        id: item.id,
-        title: item.title,
-        imageUrl: item.image_url,
-        rating: item.rating || 0,
-        isFavorite: favoriteIds.has(item.id),
-        genres: item.anime_genres?.map((g: any) => g.genres.name) || [],
-        description: item.description,
-        releaseDate: item.release_date,
-      }));
-    } catch (err) {
-      console.error("Error in formatAnimeData:", err);
-      return data.map((item) => ({
-        id: item.id,
-        title: item.title,
-        imageUrl: item.image_url,
-        rating: item.rating || 0,
-        isFavorite: false,
-        genres: item.anime_genres?.map((g: any) => g.genres.name) || [],
-        description: item.description,
-        releaseDate: item.release_date,
-      }));
-    }
-  };
+  }, []);
 
   return {
     searchResults,

@@ -6,6 +6,8 @@ import {
   StatusBar,
   TouchableOpacity,
   Alert,
+  StyleSheet,
+  ActivityIndicator,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { ArrowLeft } from "lucide-react-native";
@@ -16,224 +18,185 @@ import useAnimeData from "./hooks/useAnimeData";
 import { useAuth } from "./context/AuthContext";
 import useAnimeLists from "./hooks/useAnimeLists";
 import AuthModal from "./auth/components/AuthModal";
+import { Anime } from "./hooks/useAnimeSearch";
+import { ListType } from "./hooks/useAnimeLists";
 import type { Database } from "@/lib/database.types";
 
 // Define the Anime type to match AnimeGrid's expected type
 type Tables = Database["public"]["Tables"];
 type AnimeGridItem = Tables["anime"]["Row"] & {
-  is_favorite?: boolean;
+  isFavorite?: boolean;
   genres?: string[];
   type?: string;
 };
 
-export default function NewReleasesScreen() {
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: "#171717",
+  },
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 16,
+    backgroundColor: "#171717",
+  },
+  backButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#2A2A2A",
+  },
+  title: {
+    flex: 1,
+    fontSize: 20,
+    fontWeight: "bold",
+    color: "#FFFFFF",
+    marginLeft: 16,
+    textAlign: "center",
+  },
+  content: {
+    flex: 1,
+    paddingBottom: 70,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+});
+
+const NewReleasesScreen = () => {
   const router = useRouter();
   const { user, isLoading } = useAuth();
   const { newReleases, loading, error, fetchNewReleases } = useAnimeData();
-  const { addToList } = useAnimeLists(user?.id || null);
+  const { addToList, moveToList } = useAnimeLists(user?.id || null);
 
-  const [activeTab, setActiveTab] = useState("home");
-  const [showAuthModal, setShowAuthModal] = useState(false);
-  const [selectedGenres, setSelectedGenres] = useState<string[]>([]);
-  const [filteredAnime, setFilteredAnime] = useState<AnimeGridItem[]>([]);
-  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
-  const [selectedFilters, setSelectedFilters] = useState<string[]>([]);
+  const [animeList, setAnimeList] = useState<Anime[]>([]);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
-  // Fetch new releases on component mount
-  useEffect(() => {
-    fetchNewReleases();
-  }, [fetchNewReleases]);
+  const loadAnime = async () => {
+    try {
+      const data = await fetchNewReleases();
 
-  // Update filtered anime when newReleases, selectedGenres, or sortOrder changes
-  useEffect(() => {
-    // Convert newReleases to AnimeGridItem format
-    const convertedReleases: AnimeGridItem[] = newReleases.map(anime => ({
-      id: anime.id,
-      title: anime.title,
-      image_url: anime.imageUrl,
-      rating: anime.rating || null,
-      description: anime.description || null,
-      release_date: anime.releaseDate || null,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-      is_favorite: anime.isFavorite
-    }));
-    
-    let result = [...convertedReleases];
-
-    // Apply genre filters if any are selected
-    if (selectedGenres.length > 0) {
-      result = result.filter((anime) =>
-        anime.genres?.some((genre: string) => selectedGenres.includes(genre)),
-      );
-    }
-
-    // Apply filters
-    if (selectedFilters.length > 0) {
-      result = result.filter((anime) =>
-        selectedFilters.includes("All") || (anime.type && selectedFilters.includes(anime.type))
-      );
-    }
-
-    // Apply sorting
-    result.sort((a, b) => {
-      if (sortOrder === "asc") {
-        return (a.rating || 0) - (b.rating || 0);
-      } else {
-        return (b.rating || 0) - (a.rating || 0);
+      if (Array.isArray(data) && data.length > 0) {
+        const formattedAnime = data.map((item: Anime) => ({
+          id: item.id,
+          title: item.title,
+          imageUrl: item.imageUrl,
+          rating: item.rating || 0,
+          description: item.description,
+          releaseDate: item.releaseDate,
+          genres: item.genres || [],
+          isFavorite: item.isFavorite,
+        }));
+        setAnimeList(formattedAnime);
+      } else if (!Array.isArray(data)) {
+        console.error("Error: fetchNewReleases returned a non-array value");
+      } else if (data.length === 0) {
+        console.log("No new releases found");
       }
-    });
-
-    setFilteredAnime(result);
-  }, [newReleases, selectedGenres, selectedFilters, sortOrder]);
-
-  // Handle back button press
-  const handleBackPress = () => {
-    router.back();
-  };
-
-  // Handle filter change
-  const handleFilterChange = (filters: string[]) => {
-    setSelectedGenres(filters);
-  };
-
-  // Handle sort change
-  const handleSortChange = (order: "asc" | "desc") => {
-    setSortOrder(order);
-  };
-
-  // Handle anime press
-  const handleAnimePress = (anime: AnimeGridItem) => {
-    Alert.alert("Anime Details", `Viewing details for ${anime.title}`);
-  };
-
-  // Handle favorite toggle
-  const handleFavorite = (anime: AnimeGridItem) => {
-    if (!user) {
-      setShowAuthModal(true);
-      return;
+    } catch (error) {
+      console.error("Error loading anime:", error);
+    } finally {
+      setIsRefreshing(false);
     }
-
-    Alert.alert(
-      "Favorites",
-      `${anime.is_favorite ? "Remove from" : "Add to"} favorites?`,
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Confirm",
-          onPress: async () => {
-            // Toggle favorite status
-            console.log(`Toggled favorite status for ${anime.id}`);
-          },
-        },
-      ],
-    );
   };
 
-  // Handle add to list
-  const handleAddToList = (anime: AnimeGridItem) => {
-    if (!user) {
-      setShowAuthModal(true);
-      return;
+  const handleAddToList = async (anime: Anime) => {
+    if (!user) return;
+
+    try {
+      await addToList(anime.id, "watchlist");
+
+      Alert.alert("Success", `"${anime.title}" added to watchlist`);
+    } catch (error) {
+      console.error("Error adding to list:", error);
+      Alert.alert("Error", "Failed to add anime to watchlist");
     }
-
-    Alert.alert("Add to List", `Add "${anime.title}" to your list`, [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Watchlist",
-        onPress: () => addToList(anime.id, "watchlist"),
-      },
-      {
-        text: "Currently Watching",
-        onPress: () => addToList(anime.id, "watching"),
-      },
-      {
-        text: "Completed",
-        onPress: () => addToList(anime.id, "completed"),
-      },
-    ]);
   };
+
+  const handleFavorite = async (anime: Anime) => {
+    if (!user) return;
+
+    try {
+      const currentList = anime.isFavorite ? "favorites" : "watchlist";
+      const targetList = anime.isFavorite ? "watchlist" : "favorites";
+      
+      await moveToList(anime.id, currentList, targetList);
+
+      Alert.alert("Success", `"${anime.title}" added to favorites`);
+    } catch (error) {
+      console.error("Error adding to favorites:", error);
+      Alert.alert("Error", "Failed to add anime to favorites");
+    }
+  };
+
+  useEffect(() => {
+    loadAnime();
+  }, []);
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: "#171717" }}>
+    <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="#171717" />
-      <View style={{ flex: 1 }}>
-        <View
-          style={{
-            flexDirection: "row",
-            alignItems: "center",
-            padding: 16,
-            backgroundColor: "#171717",
-          }}
+      
+      {/* Header */}
+      <View style={styles.header}>
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={() => router.back()}
         >
-          <TouchableOpacity
-            onPress={handleBackPress}
-            style={{
-              width: 40,
-              height: 40,
-              borderRadius: 20,
-              alignItems: "center",
-              justifyContent: "center",
-              backgroundColor: "#2A2A2A",
-            }}
-          >
-            <ArrowLeft size={24} color="#FFFFFF" />
-          </TouchableOpacity>
-          <Text
-            style={{
-              flex: 1,
-              fontSize: 20,
-              fontWeight: "bold",
-              color: "#FFFFFF",
-              marginLeft: 16,
-              textAlign: "center",
-            }}
-          >
-            New Releases
-          </Text>
-          <View style={{ width: 40 }} /> {/* Empty view for balance */}
-        </View>
+          <ArrowLeft size={24} color="#FFFFFF" />
+        </TouchableOpacity>
+        <Text style={styles.title}>
+          New Releases
+        </Text>
+        <View style={{ width: 40 }} /> {/* Empty view for balance */}
+      </View>
 
-        <FilterBar
-          filters={["All", "TV", "Movie", "OVA", "Special"]}
-          selectedFilters={selectedFilters}
-          onFilterPress={(filter) => {
-            // Toggle the filter in the selectedFilters array
-            if (selectedFilters.includes(filter)) {
-              setSelectedFilters(selectedFilters.filter(f => f !== filter));
-            } else {
-              setSelectedFilters([...selectedFilters, filter]);
-            }
-          }}
-          isLoading={loading.newReleases}
-        />
-
-        <View style={{ flex: 1, paddingBottom: 70 }}>
+      {/* Main content */}
+      <View style={styles.content}>
+        {loading.newReleases ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#FFFFFF" />
+          </View>
+        ) : (
           <AnimeGrid
-            data={filteredAnime}
-            loading={loading.newReleases}
-            refreshing={loading.newReleases}
-            onRefresh={fetchNewReleases}
-            onAnimePress={handleAnimePress}
+            anime={animeList}
+            isLoading={isLoading}
+            isRefreshing={isRefreshing}
+            onRefresh={loadAnime}
+            onPress={(anime) => {
+              router.push({
+                pathname: `/anime/${anime.id}`,
+                params: { animeId: anime.id },
+              });
+            }}
             onAddToList={handleAddToList}
             onFavorite={handleFavorite}
             numColumns={2}
           />
-        </View>
-
-        <BottomNavigation
-          currentRoute="/new-releases"
-          activeTab={activeTab}
-          onTabChange={setActiveTab}
-        />
-
-        {showAuthModal && (
-          <AuthModal
-            visible={showAuthModal}
-            onClose={() => setShowAuthModal(false)}
-          />
         )}
       </View>
+
+      {/* Bottom navigation */}
+      <BottomNavigation
+        currentRoute="/new-releases"
+        activeTab="home"
+        onTabChange={() => {}}
+      />
+
+      {/* Auth modal */}
+      {isLoading && (
+        <AuthModal
+          visible={isLoading}
+          onClose={() => {}}
+        />
+      )}
     </SafeAreaView>
   );
-}
+};
+
+export default NewReleasesScreen;

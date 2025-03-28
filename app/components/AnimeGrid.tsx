@@ -13,35 +13,17 @@ import {
 import AnimeCard from "@/components/AnimeCard";
 import { useTheme } from "@/context/ThemeProvider";
 import { router } from "expo-router";
-import type { Database } from "@/lib/database.types";
-
-type UUID = string;
-
-interface Anime {
-  id: string;
-  title: string;
-  image_url: string;
-  rating?: number;
-  is_favorite?: boolean;
-  episode_count?: number;
-  release_year?: number;
-  is_new?: boolean;
-}
-
-interface AnimeGridItem extends Anime {}
+import { Anime } from "@/hooks/useAnimeSearch";
 
 interface AnimeGridProps {
-  data: AnimeGridItem[];
-  loading?: boolean;
-  refreshing?: boolean;
-  onRefresh?: () => void;
-  onEndReached?: () => void;
-  onAnimePress?: (anime: AnimeGridItem) => void;
-  onAddToList?: (anime: AnimeGridItem) => void;
-  onFavorite?: (anime: AnimeGridItem) => void;
-  ListEmptyComponent?: React.ReactElement;
-  ListHeaderComponent?: React.ReactElement;
-  numColumns?: number;
+  anime: Anime[];
+  isLoading: boolean;
+  isRefreshing: boolean;
+  onPress: (anime: Anime) => void;
+  onAddToList: (anime: Anime) => Promise<void>;
+  onFavorite: (anime: Anime) => Promise<void>;
+  onRefresh: () => Promise<void>;
+  numColumns: number;
 }
 
 /**
@@ -51,65 +33,56 @@ interface AnimeGridProps {
  * @param props - Component props
  * @returns AnimeGrid component
  */
-const AnimeGrid = React.memo(function AnimeGrid({
-  data,
-  loading = false,
-  refreshing = false,
+const AnimeGrid = ({
+  anime,
+  isLoading,
+  isRefreshing,
   onRefresh,
-  onEndReached,
-  onAnimePress,
+  onPress,
   onAddToList,
   onFavorite,
-  ListEmptyComponent,
-  ListHeaderComponent,
-  numColumns = 2,
-}: AnimeGridProps) {
+  numColumns,
+}: AnimeGridProps) => {
   const { colors } = useTheme();
   const screenWidth = Dimensions.get("window").width;
-  const cardWidth = (screenWidth - 32) / numColumns; // 32 = padding (16) * 2
+  // Adjust padding for better spacing between cards
+  const horizontalPadding = 16;
+  const cardSpacing = 8;
+  const totalHorizontalPadding = horizontalPadding * 2 + (numColumns - 1) * cardSpacing;
+  const cardWidth = (screenWidth - totalHorizontalPadding) / numColumns;
 
-  const renderItem: ListRenderItem<AnimeGridItem> = ({ item }) => {
-    const handlePress = () => {
-      if (onAnimePress) {
-        onAnimePress(item);
-      } else {
-        // Navigate to anime details screen
-        router.push({
-          pathname: `/anime/${item.id}`,
-        });
-      }
-    };
+  const renderItem = ({ item }: { item: Anime }) => (
+    <View style={[styles.cardContainer, { width: cardWidth }]}>
+      <AnimeCard
+        id={item.id}
+        title={item.title}
+        imageUrl={item.imageUrl}
+        rating={item.rating}
+        isFavorite={item.isFavorite}
+        onPress={() => onPress(item)}
+        onFavoritePress={() => onFavorite(item)}
+        onAddToListPress={() => onAddToList(item)}
+        width={cardWidth - cardSpacing}
+        height={(cardWidth - cardSpacing) * 1.5}
+        releaseYear={item.releaseDate ? new Date(item.releaseDate).getFullYear() : undefined}
+        episodeCount={undefined}
+        isNew={isNewRelease(item.releaseDate)}
+      />
+    </View>
+  );
 
-    return (
-      <View style={[styles.cardContainer, { width: cardWidth }]}>
-        <AnimeCard
-          id={item.id}
-          title={item.title}
-          imageUrl={item.image_url}
-          rating={item.rating ?? 0}
-          isFavorite={item.is_favorite}
-          episodeCount={item.episode_count}
-          releaseYear={item.release_year}
-          isNew={item.is_new}
-          onPress={handlePress}
-          onFavoritePress={() => onFavorite?.(item)}
-        />
-      </View>
-    );
+  // Helper function to determine if an anime is a new release (within the last 30 days)
+  const isNewRelease = (releaseDate?: string) => {
+    if (!releaseDate) return false;
+    const releaseTime = new Date(releaseDate).getTime();
+    const thirtyDaysAgo = Date.now() - 30 * 24 * 60 * 60 * 1000;
+    return releaseTime > thirtyDaysAgo;
   };
 
-  const keyExtractor = (item: AnimeGridItem) => item.id.toString();
+  const keyExtractor = (item: Anime) => item.id.toString();
 
-  // Custom empty component that doesn't show "End of List"
+  // Custom empty component with improved styling
   const renderEmpty = () => {
-    if (loading && !refreshing) {
-      return (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={colors.primary} />
-        </View>
-      );
-    }
-
     return (
       <View style={styles.emptyContainer}>
         <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
@@ -119,71 +92,51 @@ const AnimeGrid = React.memo(function AnimeGrid({
     );
   };
 
-  if (loading && !refreshing && data.length === 0) {
-    return (
-      <View
-        style={[
-          styles.fullScreenLoading,
-          { backgroundColor: colors.background },
-        ]}
-      >
-        <ActivityIndicator size="large" color={colors.primary} />
-      </View>
-    );
-  }
-
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <FlatList
-        data={data}
+        data={anime}
         renderItem={renderItem}
         keyExtractor={keyExtractor}
         numColumns={numColumns}
-        contentContainerStyle={styles.listContent}
+        contentContainerStyle={[
+          styles.listContent,
+          { paddingBottom: Platform.OS === "ios" ? 100 : 80 }
+        ]}
         showsVerticalScrollIndicator={false}
-        onEndReached={onEndReached}
-        onEndReachedThreshold={0.5}
         refreshControl={
-          onRefresh ? (
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={onRefresh}
-              tintColor={colors.primary}
-              colors={[colors.primary]}
-            />
-          ) : undefined
+          <RefreshControl
+            refreshing={isRefreshing}
+            onRefresh={onRefresh}
+            colors={[colors.primary]}
+            tintColor={colors.primary}
+          />
         }
-        ListEmptyComponent={ListEmptyComponent || renderEmpty}
-        ListHeaderComponent={ListHeaderComponent}
+        ListEmptyComponent={renderEmpty}
         ListFooterComponent={
-          loading && data.length > 0 ? (
-            <View style={styles.footerLoading}>
-              <ActivityIndicator size="small" color={colors.primary} />
-            </View>
+          isLoading ? (
+            <ActivityIndicator 
+              size="large" 
+              color={colors.primary}
+              style={styles.loadingIndicator} 
+            />
           ) : null
         }
       />
     </View>
   );
-});
+};
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
   cardContainer: {
-    padding: 8,
+    padding: 4,
   },
   listContent: {
-    paddingHorizontal: 16,
-    paddingBottom: Platform.OS === "ios" ? 100 : 80,
+    paddingHorizontal: 12,
     paddingTop: 8,
-  },
-  loadingContainer: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 40,
   },
   emptyContainer: {
     flex: 1,
@@ -194,16 +147,11 @@ const styles = StyleSheet.create({
   emptyText: {
     textAlign: "center",
     fontSize: 14,
+    fontWeight: "500",
   },
-  fullScreenLoading: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  footerLoading: {
-    paddingVertical: 16,
-    alignItems: "center",
-  },
+  loadingIndicator: {
+    marginVertical: 20,
+  }
 });
 
 export default AnimeGrid;

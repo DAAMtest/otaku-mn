@@ -22,11 +22,8 @@ interface NavItem {
 
 const navItems: NavItem[] = [
   { name: "Home", href: "/", icon: Home },
-  { name: "Search", href: "/search", icon: Search },
-  { name: "Notifications", href: "/notifications", icon: Bell },
-  { name: "Favorites", href: "/favorites", icon: Heart },
+  { name: "Library", href: "/library", icon: Heart },
   { name: "Profile", href: "/profile", icon: User },
-  // Library removed as it's now handled in profile screen
 ];
 
 interface BottomNavigationProps {
@@ -34,6 +31,7 @@ interface BottomNavigationProps {
   activeTab?: string;
   onTabChange?: (tab: string) => void;
   notificationCount?: number;
+  style?: any;
 }
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
@@ -49,6 +47,7 @@ const BottomNavigation = React.memo(function BottomNavigation({
   activeTab,
   onTabChange,
   notificationCount = 0,
+  style,
 }: BottomNavigationProps = {}) {
   const router = useRouter();
   const pathname = usePathname();
@@ -120,9 +119,11 @@ const BottomNavigation = React.memo(function BottomNavigation({
     <Animated.View
       style={[
         styles.container,
+        style,
         {
-          backgroundColor: colors.card,
-          borderTopColor: colors.border,
+          backgroundColor: isDarkMode ? '#0F172A' : '#FFFFFF',
+          borderTopColor: isDarkMode ? 'rgba(30, 41, 59, 0.8)' : 'rgba(226, 232, 240, 0.8)',
+          borderTopWidth: 1,
           shadowColor: isDarkMode ? "rgba(0, 0, 0, 0.5)" : "rgba(0, 0, 0, 0.2)",
           transform: [
             {
@@ -169,56 +170,54 @@ const BottomNavigation = React.memo(function BottomNavigation({
                   accessibilityHint={`Navigate to ${item.name}`}
                 >
                   <View style={styles.tabContent}>
+                    {isActive && (
+                      <View
+                        style={[
+                          styles.activeIndicator,
+                          { backgroundColor: colors.primary }
+                        ]}
+                      />
+                    )}
                     <View
                       style={[
                         styles.iconContainer,
-                        isActive && styles.activeIconContainer,
+                        isActive && { 
+                          backgroundColor: isDarkMode 
+                            ? 'rgba(99, 102, 241, 0.15)' 
+                            : 'rgba(99, 102, 241, 0.1)' 
+                        }
                       ]}
                     >
                       <Icon
                         size={22}
-                        color={isActive ? colors.primary : colors.inactive}
+                        color={isActive ? colors.primary : colors.textSecondary}
                         strokeWidth={isActive ? 2.5 : 2}
                       />
-                      {item.name === "Notifications" &&
-                        unreadNotifications > 0 && (
-                          <View
-                            style={[
-                              styles.badge,
-                              { backgroundColor: colors.error },
-                            ]}
-                          >
-                            <Text style={styles.badgeText}>
-                              {unreadNotifications > 9
-                                ? "9+"
-                                : unreadNotifications}
-                            </Text>
-                          </View>
-                        )}
                     </View>
                     <Text
                       style={[
                         styles.tabLabel,
                         {
-                          color: isActive ? colors.primary : colors.inactive,
-                          fontWeight: isActive ? "600" : "400",
-                          opacity: isActive ? 1 : 0.8,
-                        },
+                          color: isActive ? colors.primary : colors.textSecondary,
+                          fontWeight: isActive ? '600' : '400',
+                        }
                       ]}
-                      numberOfLines={1}
                     >
                       {item.name}
                     </Text>
+                    {item.name === "Notifications" && unreadNotifications > 0 && (
+                      <View
+                        style={[
+                          styles.badge,
+                          { backgroundColor: colors.error },
+                        ]}
+                      >
+                        <Text style={styles.badgeText}>
+                          {unreadNotifications > 9 ? "9+" : unreadNotifications}
+                        </Text>
+                      </View>
+                    )}
                   </View>
-
-                  {isActive && (
-                    <Animated.View
-                      style={[
-                        styles.activeIndicator,
-                        { backgroundColor: colors.primary },
-                      ]}
-                    />
-                  )}
                 </TouchableOpacity>
               </Animated.View>
             );
@@ -237,61 +236,51 @@ const styles = StyleSheet.create({
     right: 0,
     borderTopWidth: 1,
     elevation: 8,
-    shadowOffset: { width: 0, height: -3 },
-    shadowOpacity: 0.3,
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.1,
     shadowRadius: 3,
-    zIndex: 9999,
+    zIndex: 100,
   },
   safeArea: {
-    width: "100%",
+    backgroundColor: "transparent",
   },
   tabRow: {
     flexDirection: "row",
-    paddingBottom: Platform.OS === "ios" ? 20 : 8,
-    paddingTop: 8,
+    justifyContent: "space-around",
+    alignItems: "center",
+    paddingVertical: 8,
   },
   tabContainer: {
     flex: 1,
+    alignItems: "center",
   },
   tabButton: {
-    flex: 1,
     alignItems: "center",
     justifyContent: "center",
-    position: "relative",
-    paddingVertical: 4,
+    paddingVertical: 6,
+    width: "100%",
   },
   tabContent: {
     alignItems: "center",
     justifyContent: "center",
+    position: "relative",
   },
   iconContainer: {
-    width: 40,
-    height: 40,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     alignItems: "center",
     justifyContent: "center",
-    borderRadius: 20,
-    marginBottom: 2,
-  },
-  activeIconContainer: {
-    backgroundColor: "rgba(99, 102, 241, 0.1)", // Primary color with opacity
+    marginBottom: 4,
   },
   tabLabel: {
-    fontSize: 11,
-    fontFamily: Platform.OS === "ios" ? "System" : "Roboto",
-    marginTop: 0,
-  },
-  activeIndicator: {
-    position: "absolute",
-    bottom: 0,
-    height: 3,
-    width: "30%",
-    borderTopLeftRadius: 3,
-    borderTopRightRadius: 3,
+    fontSize: 12,
+    textAlign: "center",
   },
   badge: {
     position: "absolute",
-    top: -2,
-    right: -2,
+    top: 0,
+    right: -4,
     minWidth: 16,
     height: 16,
     borderRadius: 8,
@@ -300,9 +289,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: 4,
   },
   badgeText: {
-    color: "white",
-    fontSize: 10,
+    color: "#FFFFFF",
+    fontSize: 9,
     fontWeight: "bold",
+  },
+  activeIndicator: {
+    position: 'absolute',
+    top: -14,
+    width: 24,
+    height: 3,
+    borderRadius: 2,
   },
 });
 
