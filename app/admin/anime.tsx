@@ -399,7 +399,7 @@ export default function AnimeManagement() {
         {/* Anime List */}
         {loading ? (
           <View className="flex-1 items-center justify-center">
-            <ActivityIndicator size="large" color="#6366F1" />
+            <ActivityIndicator size="large" color="#40C057" />
             <Text className="text-gray-400 mt-4">Loading anime...</Text>
           </View>
         ) : (
@@ -416,7 +416,7 @@ export default function AnimeManagement() {
                     : "No anime available"}
                 </Text>
                 <TouchableOpacity
-                  className="mt-4 bg-blue-600 px-4 py-2 rounded-lg"
+                  className="mt-4 bg-green-600 px-4 py-2 rounded-lg"
                   onPress={handleAddAnime}
                 >
                   <Text className="text-white">Add New Anime</Text>
@@ -554,7 +554,7 @@ export default function AnimeManagement() {
               </ScrollView>
 
               <TouchableOpacity
-                className="bg-blue-600 rounded-lg py-3 items-center mt-4"
+                className="bg-green-600 rounded-lg py-3 items-center mt-4"
                 onPress={handleSaveAnime}
               >
                 <View className="flex-row items-center">

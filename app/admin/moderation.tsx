@@ -355,7 +355,7 @@ export default function ContentModeration() {
           {/* Status Filter Buttons */}
           <View className="flex-row mb-2">
             <TouchableOpacity
-              className={`mr-2 px-3 py-1 rounded-full ${filterStatus === null ? "bg-purple-600" : "bg-gray-700"}`}
+              className={`mr-2 px-3 py-1 rounded-full ${filterStatus === null ? "bg-green-600" : "bg-gray-700"}`}
               onPress={() => setFilterStatus(null)}
             >
               <Text className="text-white">All</Text>
@@ -384,7 +384,7 @@ export default function ContentModeration() {
         {/* Reports List */}
         {loading ? (
           <View className="flex-1 items-center justify-center">
-            <ActivityIndicator size="large" color="#6366F1" />
+            <ActivityIndicator size="large" color="#40C057" />
             <Text className="text-gray-400 mt-4">Loading reports...</Text>
           </View>
         ) : (
@@ -532,7 +532,7 @@ export default function ContentModeration() {
 
                   {/* View Content Button */}
                   <TouchableOpacity
-                    className="bg-blue-600 rounded-lg py-3 items-center mt-4"
+                    className="bg-green-600 rounded-lg py-3 items-center mt-4"
                     onPress={() => {
                       setModalVisible(false);
                       // Navigate to content based on type

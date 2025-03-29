@@ -1,6 +1,6 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
-import { useColorScheme as useNativeColorScheme } from 'react-native';
-import type { PropsWithChildren } from 'react';
+import React, { createContext, useContext, useEffect, useState } from "react";
+import { useColorScheme as useNativeColorScheme } from "react-native";
+import type { PropsWithChildren } from "react";
 
 // Define our theme colors
 interface Theme {
@@ -31,12 +31,12 @@ interface Theme {
 }
 
 export const lightTheme: Theme = {
-  primary: "#1E40AF",
-  primaryLight: "#3B82F6",
-  primaryDark: "#1D4ED8",
-  secondary: "#4F46E5",
-  secondaryLight: "#7C3AED",
-  secondaryDark: "#4338CA",
+  primary: "#37B24D", // Deku's green
+  primaryLight: "#69DB7C",
+  primaryDark: "#2B9348",
+  secondary: "#FF5252", // Accent red
+  secondaryLight: "#FF7B7B",
+  secondaryDark: "#D32F2F",
   background: "#F9FAFB", // Lighter background for better contrast
   text: "#111827", // Darker text for better readability
   textSecondary: "#4B5563", // Darker secondary text
@@ -58,13 +58,13 @@ export const lightTheme: Theme = {
 };
 
 export const darkTheme: Theme = {
-  primary: "#3B82F6",
-  primaryLight: "#60A5FA",
-  primaryDark: "#1D4ED8",
-  secondary: "#7C3AED",
-  secondaryLight: "#A78BFA",
-  secondaryDark: "#4338CA",
-  background: "#0F172A", // Darker background for better contrast
+  primary: "#40C057", // Deku's green (brighter for dark mode)
+  primaryLight: "#69DB7C",
+  primaryDark: "#2B9348",
+  secondary: "#FF5252", // Accent red
+  secondaryLight: "#FF7B7B",
+  secondaryDark: "#D32F2F",
+  background: "#0A1929", // Darker blue background inspired by MHA night scenes
   text: "#F9FAFB", // Brighter text for better readability
   textSecondary: "#9CA3AF",
   border: "#374151",
@@ -74,10 +74,10 @@ export const darkTheme: Theme = {
   info: "#60A5FA",
   overlay: "rgba(0, 0, 0, 0.8)",
   yellow: "#FBBF24", // More consistent yellow
-  red: "#EF4444", // More consistent red
+  red: "#FF5252", // More consistent red
   white: "#FFFFFF",
-  card: "#1E293B", // Slightly lighter card background for better distinction
-  cardHover: "#334155", // Darker hover state
+  card: "#132F4C", // Slightly lighter card background with blue tint
+  cardHover: "#173A5E", // Darker hover state with blue tint
   inactive: "#6B7280",
   skeleton: "#374151",
   placeholder: "#6B7280", // Added placeholder color
@@ -134,7 +134,7 @@ export function ThemeProvider({ children }: PropsWithChildren) {
 export function useTheme() {
   const context = useContext(ThemeContext);
   if (context === undefined) {
-    throw new Error('useTheme must be used within a ThemeProvider');
+    throw new Error("useTheme must be used within a ThemeProvider");
   }
   return context;
 }

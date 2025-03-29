@@ -1,6 +1,32 @@
 export interface Database {
   public: {
     Tables: {
+      users: {
+        Row: {
+          id: string;
+          username: string;
+          avatar_url: string | null;
+          bio?: string | null;
+          created_at: string | null;
+          updated_at: string | null;
+        };
+        Insert: {
+          id: string;
+          username: string;
+          avatar_url?: string | null;
+          bio?: string | null;
+          created_at?: string | null;
+          updated_at?: string | null;
+        };
+        Update: {
+          id?: string;
+          username?: string;
+          avatar_url?: string | null;
+          bio?: string | null;
+          created_at?: string | null;
+          updated_at?: string | null;
+        };
+      };
       anime: {
         Row: {
           id: string;

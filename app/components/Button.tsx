@@ -1,17 +1,17 @@
-import React from 'react';
-import { 
-  TouchableOpacity, 
-  StyleSheet, 
-  ActivityIndicator, 
+import React from "react";
+import {
+  TouchableOpacity,
+  StyleSheet,
+  ActivityIndicator,
   TouchableOpacityProps,
   View,
-  Platform
-} from 'react-native';
-import { useTheme } from '@/context/ThemeProvider';
-import Typography from './Typography';
+  Platform,
+} from "react-native";
+import { useTheme } from "@/context/ThemeProvider";
+import Typography from "./Typography";
 
-export type ButtonVariant = 'primary' | 'secondary' | 'outline' | 'ghost';
-export type ButtonSize = 'sm' | 'md' | 'lg';
+export type ButtonVariant = "primary" | "secondary" | "outline" | "ghost";
+export type ButtonSize = "sm" | "md" | "lg";
 
 interface ButtonProps extends TouchableOpacityProps {
   title: string;
@@ -22,7 +22,7 @@ interface ButtonProps extends TouchableOpacityProps {
   rightIcon?: React.ReactNode;
   fullWidth?: boolean;
   accessibilityHint?: string;
-  hapticFeedback?: 'light' | 'medium' | 'heavy' | 'none';
+  hapticFeedback?: "light" | "medium" | "heavy" | "none";
 }
 
 /**
@@ -32,8 +32,8 @@ interface ButtonProps extends TouchableOpacityProps {
  */
 export default function Button({
   title,
-  variant = 'primary',
-  size = 'md',
+  variant = "primary",
+  size = "md",
   isLoading = false,
   leftIcon,
   rightIcon,
@@ -41,83 +41,90 @@ export default function Button({
   style,
   disabled,
   accessibilityHint,
-  hapticFeedback = 'light',
+  hapticFeedback = "light",
   onPress,
   ...props
 }: ButtonProps) {
   const { colors } = useTheme();
-  
+
   // Determine background and text colors based on variant
   const getColors = () => {
     switch (variant) {
-      case 'primary':
+      case "primary":
         return {
           background: disabled ? colors.inactive : colors.primary,
-          text: '#FFFFFF',
-          border: 'transparent',
+          text: "#FFFFFF",
+          border: "transparent",
         };
-      case 'secondary':
+      case "secondary":
         return {
           background: disabled ? colors.inactive : colors.secondary,
-          text: '#FFFFFF',
-          border: 'transparent',
+          text: "#FFFFFF",
+          border: "transparent",
         };
-      case 'outline':
+      case "outline":
         return {
-          background: 'transparent',
+          background: "transparent",
           text: disabled ? colors.inactive : colors.primary,
           border: disabled ? colors.inactive : colors.primary,
         };
-      case 'ghost':
+      case "ghost":
         return {
-          background: 'transparent',
+          background: "transparent",
           text: disabled ? colors.inactive : colors.primary,
-          border: 'transparent',
+          border: "transparent",
         };
       default:
         return {
           background: disabled ? colors.inactive : colors.primary,
-          text: '#FFFFFF',
-          border: 'transparent',
+          text: "#FFFFFF",
+          border: "transparent",
         };
     }
   };
-  
+
   // Determine padding based on size
   const getPadding = () => {
     switch (size) {
-      case 'sm': return { paddingVertical: 6, paddingHorizontal: 12 };
-      case 'md': return { paddingVertical: 10, paddingHorizontal: 16 };
-      case 'lg': return { paddingVertical: 14, paddingHorizontal: 20 };
-      default: return { paddingVertical: 10, paddingHorizontal: 16 };
+      case "sm":
+        return { paddingVertical: 8, paddingHorizontal: 14 };
+      case "md":
+        return { paddingVertical: 12, paddingHorizontal: 18 };
+      case "lg":
+        return { paddingVertical: 16, paddingHorizontal: 24 };
+      default:
+        return { paddingVertical: 12, paddingHorizontal: 18 };
     }
   };
-  
+
   // Get font size based on size
-  const getFontSize = (): 'button' | 'bodySmall' | 'body' => {
+  const getFontSize = (): "button" | "bodySmall" | "body" => {
     switch (size) {
-      case 'sm': return 'bodySmall';
-      case 'lg': return 'body';
-      default: return 'button';
+      case "sm":
+        return "bodySmall";
+      case "lg":
+        return "body";
+      default:
+        return "button";
     }
   };
-  
+
   // Handle press with haptic feedback
   const handlePress = (event: any) => {
     if (disabled || isLoading) return;
-    
+
     // Trigger haptic feedback if enabled
-    if (hapticFeedback !== 'none') {
+    if (hapticFeedback !== "none") {
       try {
-        const Haptics = require('expo-haptics');
+        const Haptics = require("expo-haptics");
         switch (hapticFeedback) {
-          case 'light':
+          case "light":
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
             break;
-          case 'medium':
+          case "medium":
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
             break;
-          case 'heavy':
+          case "heavy":
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
             break;
         }
@@ -125,23 +132,23 @@ export default function Button({
         // Haptics not available, continue silently
       }
     }
-    
+
     // Call the original onPress handler
     if (onPress) {
       onPress(event);
     }
   };
-  
+
   const { background, text, border } = getColors();
   const padding = getPadding();
   const fontSize = getFontSize();
-  
+
   // Determine the appropriate accessibility role based on the button's purpose
   const getAccessibilityRole = () => {
-    if (isLoading) return 'progressbar';
-    return 'button';
+    if (isLoading) return "progressbar";
+    return "button";
   };
-  
+
   // Generate appropriate accessibility state
   const getAccessibilityState = () => {
     return {
@@ -149,7 +156,7 @@ export default function Button({
       busy: isLoading,
     };
   };
-  
+
   return (
     <TouchableOpacity
       activeOpacity={0.7}
@@ -159,8 +166,8 @@ export default function Button({
         {
           backgroundColor: background,
           borderColor: border,
-          borderWidth: variant === 'outline' ? 1 : 0,
-          width: fullWidth ? '100%' : 'auto',
+          borderWidth: variant === "outline" ? 1 : 0,
+          width: fullWidth ? "100%" : "auto",
           opacity: disabled ? 0.7 : 1,
         },
         padding,
@@ -177,23 +184,19 @@ export default function Button({
         {leftIcon && !isLoading && (
           <View style={styles.leftIcon}>{leftIcon}</View>
         )}
-        
+
         {isLoading ? (
-          <ActivityIndicator 
-            size="small" 
-            color={text} 
+          <ActivityIndicator
+            size="small"
+            color={text}
             accessibilityLabel="Loading"
           />
         ) : (
-          <Typography 
-            variant={fontSize} 
-            color={text} 
-            weight="600"
-          >
+          <Typography variant={fontSize} color={text} weight="600">
             {title}
           </Typography>
         )}
-        
+
         {rightIcon && !isLoading && (
           <View style={styles.rightIcon}>{rightIcon}</View>
         )}
@@ -204,25 +207,25 @@ export default function Button({
 
 const styles = StyleSheet.create({
   button: {
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexDirection: 'row',
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.2,
-    shadowRadius: 1.5,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    flexDirection: "row",
+    elevation: 3,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 2.5,
   },
   contentContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
   },
   leftIcon: {
-    marginRight: 8,
+    marginRight: 10,
   },
   rightIcon: {
-    marginLeft: 8,
+    marginLeft: 10,
   },
 });
