@@ -12,6 +12,7 @@ import {
 import { useRouter, usePathname } from "expo-router";
 import { Home, Heart, User, Search, Bell } from "lucide-react-native";
 import { useTheme } from "@/context/ThemeProvider";
+import { useAuth } from "@/context/AuthContext";
 
 interface NavItem {
   name: string;
@@ -30,7 +31,6 @@ interface BottomNavigationProps {
   currentRoute?: string;
   activeTab?: string;
   onTabChange?: (tab: string) => void;
-  notificationCount?: number;
   style?: any;
 }
 
@@ -46,21 +46,12 @@ const BottomNavigation = React.memo(function BottomNavigation({
   currentRoute,
   activeTab,
   onTabChange,
-  notificationCount = 0,
   style,
 }: BottomNavigationProps = {}) {
   const router = useRouter();
   const pathname = usePathname();
   const { colors, isDarkMode } = useTheme();
-
-  // Local state for notification count (in a real app, this would come from a global state or context)
-  const [unreadNotifications, setUnreadNotifications] =
-    useState(notificationCount);
-
-  // Update local state when prop changes
-  useEffect(() => {
-    setUnreadNotifications(notificationCount);
-  }, [notificationCount]);
+  const { user } = useAuth(); // Get user auth state
 
   // Use provided currentRoute or determine from pathname
   const activeRoute = currentRoute || pathname;
@@ -138,9 +129,14 @@ const BottomNavigation = React.memo(function BottomNavigation({
       accessibilityRole="tablist"
       accessibilityLabel="Bottom navigation"
     >
-      <SafeAreaView style={styles.safeArea}>
+      <SafeAreaView style={styles.safeArea}> 
         <View style={styles.tabRow}>
           {navItems.map((item, index) => {
+            // Conditionally skip rendering Library tab if user is not logged in
+            if (item.name === 'Library' && !user) {
+              return null;
+            }
+
             const isActive = activeRoute === item.href;
             const Icon = item.icon;
 
@@ -176,7 +172,9 @@ const BottomNavigation = React.memo(function BottomNavigation({
                           styles.activeIndicator,
                           { backgroundColor: colors.primary }
                         ]}
-                      />
+                      >
+                        <Text style={{ color: 'transparent' }}>.</Text>
+                      </View>
                     )}
                     <View
                       style={[
@@ -205,18 +203,6 @@ const BottomNavigation = React.memo(function BottomNavigation({
                     >
                       {item.name}
                     </Text>
-                    {item.name === "Notifications" && unreadNotifications > 0 && (
-                      <View
-                        style={[
-                          styles.badge,
-                          { backgroundColor: colors.error },
-                        ]}
-                      >
-                        <Text style={styles.badgeText}>
-                          {unreadNotifications > 9 ? "9+" : unreadNotifications}
-                        </Text>
-                      </View>
-                    )}
                   </View>
                 </TouchableOpacity>
               </Animated.View>
@@ -230,20 +216,20 @@ const BottomNavigation = React.memo(function BottomNavigation({
 
 const styles = StyleSheet.create({
   container: {
-    position: "absolute",
-    bottom: 0,
-    left: 0,
+    position: "absolute", 
+    bottom: 0, 
+    left: 0, 
     right: 0,
     borderTopWidth: 1,
-    elevation: 8,
+    elevation: 8, 
     shadowOffset: { width: 0, height: -2 },
     shadowOpacity: 0.1,
     shadowRadius: 3,
     zIndex: 100,
   },
-  safeArea: {
-    backgroundColor: "transparent",
-  },
+  safeArea: { 
+    backgroundColor: "transparent", 
+  }, 
   tabRow: {
     flexDirection: "row",
     justifyContent: "space-around",
@@ -276,22 +262,6 @@ const styles = StyleSheet.create({
   tabLabel: {
     fontSize: 12,
     textAlign: "center",
-  },
-  badge: {
-    position: "absolute",
-    top: 0,
-    right: -4,
-    minWidth: 16,
-    height: 16,
-    borderRadius: 8,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: 4,
-  },
-  badgeText: {
-    color: "#FFFFFF",
-    fontSize: 9,
-    fontWeight: "bold",
   },
   activeIndicator: {
     position: 'absolute',

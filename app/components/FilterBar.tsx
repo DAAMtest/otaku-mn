@@ -169,17 +169,27 @@ const FilterBar = React.memo(function FilterBar({
         </View>
       )}
 
-      <FlatList
-        data={isLoading ? loadingPlaceholders : sortedOptions}
-        renderItem={isLoading ? renderLoadingItem : renderFilterItem as any}
-        keyExtractor={(item: any) =>
-          typeof item === "string" ? item : item.id
-        }
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.filterList}
-        ItemSeparatorComponent={() => <View style={styles.separator} />}
-      />
+      {isLoading ? (
+        <FlatList
+          data={loadingPlaceholders}
+          renderItem={renderLoadingItem}
+          keyExtractor={(item: any) => item.id}
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.filterList}
+          ItemSeparatorComponent={() => <View style={styles.separator} />}
+        />
+      ) : (
+        <FlatList
+          data={sortedOptions}
+          renderItem={renderFilterItem as any}
+          keyExtractor={(item: any) => item.id}
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.filterList}
+          ItemSeparatorComponent={() => <View style={styles.separator} />}
+        />
+      )}
     </View>
   );
 });

@@ -18,17 +18,16 @@ interface AnimeCardProps {
   id: string;
   title: string;
   imageUrl: string;
-  rating: number | undefined;
+  rating: number;
   isFavorite: boolean;
-  episodeCount?: number;
-  releaseYear?: number;
-  isNew?: boolean;
   onPress: () => void;
-  onFavoritePress?: () => void;
-  onAddToListPress?: () => void;
-  size?: 'small' | 'medium' | 'large';
-  width?: number;
-  height?: number;
+  onFavoritePress: () => void;
+  onAddToListPress: () => void;
+  width: number;
+  height: number;
+  releaseYear?: number;
+  episodeCount?: number;
+  isNew?: boolean;
 }
 
 /**
@@ -41,15 +40,14 @@ const AnimeCard = ({
   imageUrl,
   rating,
   isFavorite,
-  episodeCount,
-  releaseYear,
-  isNew,
   onPress,
   onFavoritePress,
   onAddToListPress,
-  size = 'medium',
   width,
-  height
+  height,
+  releaseYear,
+  episodeCount,
+  isNew,
 }: AnimeCardProps) => {
   const { colors } = useTheme();
   const scaleAnim = useRef(new Animated.Value(1)).current;
@@ -61,7 +59,7 @@ const AnimeCard = ({
     large: { width: 180, height: 270 },
   };
 
-  const { width: defaultWidth, height: defaultHeight } = dimensions[size];
+  const { width: defaultWidth, height: defaultHeight } = dimensions['medium'];
 
   // Use provided width and height if available, otherwise use default dimensions
   const cardWidth = width ?? defaultWidth;
@@ -187,7 +185,7 @@ const AnimeCard = ({
           />
 
           {/* Rating badge */}
-          {rating !== undefined && rating > 0 && (
+          {rating > 0 && (
             <View
               style={[
                 styles.ratingContainer,
@@ -195,7 +193,7 @@ const AnimeCard = ({
               ]}
             >
               <Star size={14} color={colors.yellow} />
-              <Text style={styles.ratingText}>{rating?.toFixed(1)}</Text>
+              <Text style={styles.ratingText}>{rating.toFixed(1)}</Text>
             </View>
           )}
 

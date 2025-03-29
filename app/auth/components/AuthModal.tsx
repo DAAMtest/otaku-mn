@@ -21,7 +21,9 @@ import { useTheme } from "@/context/ThemeProvider";
 interface AuthModalProps {
   visible?: boolean;
   onClose?: () => void;
-  onLogin?: () => Promise<void>;
+  onLogin?: (email: string, password: string) => Promise<void>;
+  onRegister?: (email: string, password: string, username: string) => void;
+  onSocialLogin?: (provider: string) => void;
   initialMode?: 'login' | 'register';
 }
 
@@ -29,6 +31,8 @@ const AuthModal = ({
   visible = false,
   onClose = () => {},
   onLogin,
+  onRegister,
+  onSocialLogin,
   initialMode = 'login',
 }: AuthModalProps) => {
   const router = useRouter();
@@ -70,7 +74,7 @@ const AuthModal = ({
         }
 
         if (onLogin) {
-          await onLogin();
+          await onLogin(email, password);
         }
         onClose();
         router.replace('/(tabs)');
@@ -105,8 +109,8 @@ const AuthModal = ({
           "Success",
           "Registration successful! Please check your email to verify your account."
         );
-        if (onLogin) {
-          await onLogin();
+        if (onRegister) {
+          onRegister(email, password, username);
         }
         onClose();
       }

@@ -3,11 +3,11 @@ import {
   View,
   StyleSheet,
   ScrollView,
-  SafeAreaView,
   ActivityIndicator,
   Image,
   TouchableOpacity,
   Dimensions,
+  Platform,
 } from "react-native";
 import { useLocalSearchParams, Stack, router } from "expo-router";
 import { useTheme } from "@/context/ThemeProvider";
@@ -17,7 +17,6 @@ import Button from "@/components/Button";
 import VideoThumbnail from "@/components/VideoThumbnail";
 import Badge from "@/components/Badge";
 import { supabase } from "@/lib/supabase";
-import "./_layout";
 import {
   ChevronLeft,
   Heart,
@@ -379,19 +378,35 @@ export default function AnimeDetailsScreen() {
     if (!animeDetails) return null;
 
     return (
-      <View style={styles.detailsContainer}>
-        <View style={styles.headerSection}>
-          <View style={styles.titleContainer}>
+      // Added a fragment to wrap poster and details
+      <> 
+        {/* Moved Poster Rendering Here */}
+        <View style={styles.animeInfoContainer}>
+          <View style={styles.posterContainer}>
+            <Image
+              source={{ uri: animeDetails.imageUrl }}
+              style={styles.posterImage}
+              resizeMode="cover"
+            />
+          </View>
+          {/* Removed stray comment */}
+        </View>
+
+        {/* Original Details Container */}
+        <View style={styles.detailsContainer}>
+          <View style={styles.headerSection}>
+            <View style={styles.titleContainer}>
             <Typography variant="h1" style={styles.title}>
-              {animeDetails.title}
+              {String(animeDetails.title)} {/* Ensure title is string */}
             </Typography>
             {animeDetails.releaseYear && (
               <Typography variant="body" style={styles.year}>
-                ({animeDetails.releaseYear})
+                {'(' + animeDetails.releaseYear + ')'} 
               </Typography>
             )}
           </View>
 
+          {/* Uncommented statsContainer */}
           <View style={styles.statsContainer}>
             {animeDetails.rating && (
               <View style={styles.statItem}>
@@ -418,14 +433,18 @@ export default function AnimeDetailsScreen() {
               </View>
             )}
           </View>
+          
 
+          {/* Uncommented genreContainer */}
           <View style={styles.genreContainer}>
-            {animeDetails.genres?.map((genre, index) => (
-              <Badge key={index} label={genre} />
+            {animeDetails.genres?.map((genre) => ( 
+              <Badge key={genre} label={genre} /> 
             ))}
           </View>
+          
         </View>
 
+        {/* Uncommented actionButtonsContainer */}
         <View style={styles.actionButtonsContainer}>
           <TouchableOpacity
             style={[
@@ -488,7 +507,9 @@ export default function AnimeDetailsScreen() {
             </Typography>
           </TouchableOpacity>
         </View>
+        
 
+        {/* Uncommented descriptionContainer */}
         <View style={styles.descriptionContainer}>
           <Typography variant="h2" style={styles.sectionTitle}>
             Synopsis
@@ -497,7 +518,9 @@ export default function AnimeDetailsScreen() {
             {animeDetails.description}
           </Typography>
         </View>
+        
 
+        {/* Uncommented alternativeTitles section */}
         {animeDetails.alternativeTitles && animeDetails.alternativeTitles.length > 0 && (
           <View style={styles.infoSection}>
             <Typography variant="h2" style={styles.sectionTitle}>
@@ -508,7 +531,9 @@ export default function AnimeDetailsScreen() {
             </Typography>
           </View>
         )}
+        
 
+        {/* Uncommented season section */}
         {animeDetails.season && (
           <View style={styles.infoSection}>
             <Typography variant="h2" style={styles.sectionTitle}>
@@ -519,7 +544,9 @@ export default function AnimeDetailsScreen() {
             </Typography>
           </View>
         )}
+        
 
+        {/* Uncommented tabContainer */}
         <View style={styles.tabContainer}>
           <TouchableOpacity
             style={[
@@ -556,14 +583,17 @@ export default function AnimeDetailsScreen() {
             </Typography>
           </TouchableOpacity>
         </View>
+        
 
+        {/* Restored calls */}
         {activeTab === "episodes" && renderEpisodes()}
         {activeTab === "related" && renderRelatedAnime()}
-      </View>
+        </View> 
+      </> // Close fragment
     );
   };
 
-  // Render episodes
+  // Render episodes (Restored content)
   const renderEpisodes = () => {
     if (!animeDetails || !animeDetails.episodes) return null;
 
@@ -602,15 +632,18 @@ export default function AnimeDetailsScreen() {
     );
   };
 
-  // Render related anime
+  // Render related anime (Restored content with nullish coalescing and dynamic label)
   const renderRelatedAnime = () => {
-    if (!animeDetails || !animeDetails.relatedAnime) return null;
+    // Add check for array and length
+    if (!animeDetails || !Array.isArray(animeDetails.relatedAnime) || animeDetails.relatedAnime.length === 0) {
+        return null;
+    }
 
     return (
       <View style={styles.relatedContainer}>
-        {animeDetails.relatedAnime.map((related) => (
+        {animeDetails.relatedAnime.map((related, index) => ( 
           <TouchableOpacity
-            key={related.id}
+            key={index} // Use index as key
             style={styles.relatedAnimeItem}
             onPress={() => handleRelatedAnimeSelect(related.id)}
           >
@@ -621,13 +654,13 @@ export default function AnimeDetailsScreen() {
             />
             <View style={styles.relatedAnimeInfo}>
               <Typography variant="body" numberOfLines={2}>
-                {related.title}
+                {String(related.title ?? '')} {/* Ensure title is string, fallback for null/undefined */}
               </Typography>
               <Badge
-                label={
-                  related.relation.charAt(0).toUpperCase() +
-                  related.relation.slice(1)
-                }
+                label={String( // Ensure label is string
+                  (related.relation?.charAt(0).toUpperCase() ?? '') + // Null check for relation and charAt
+                  (related.relation?.slice(1) ?? '') // Null check for relation and slice
+                )}
                 variant="default"
                 size="sm"
                 style={styles.relationBadge}
@@ -678,8 +711,11 @@ export default function AnimeDetailsScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
-      <ScrollView style={styles.scrollView}>
+    <View style={styles.container}>
+      <ScrollView 
+        style={styles.scrollView} 
+        contentContainerStyle={styles.scrollViewContent}
+      >
         {/* Cover Image */}
         <View style={styles.coverImageContainer}>
           {animeDetails.coverImageUrl ? (
@@ -705,60 +741,11 @@ export default function AnimeDetailsScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* Anime Info */}
-        <View style={styles.animeInfoContainer}>
-          <View style={styles.posterContainer}>
-            <Image
-              source={{ uri: animeDetails.imageUrl }}
-              style={styles.posterImage}
-              resizeMode="cover"
-            />
-          </View>
-          <View style={styles.infoContainer}>
-            <Typography variant="h1" style={styles.title}>
-              {animeDetails.title}
-            </Typography>
-            <View style={styles.metaContainer}>
-              {animeDetails.rating && (
-                <View style={styles.metaItem}>
-                  <Star size={16} color="#FFD700" />
-                  <Typography variant="body" style={styles.metaText}>
-                    {animeDetails.rating.toFixed(1)}
-                  </Typography>
-                </View>
-              )}
-              {animeDetails.releaseDate && (
-                <View style={styles.metaItem}>
-                  <Calendar size={16} color={colors.primary} />
-                  <Typography variant="body" style={styles.metaText}>
-                    {animeDetails.releaseDate}
-                  </Typography>
-                </View>
-              )}
-              {animeDetails.status && (
-                <View style={styles.metaItem}>
-                  <Info size={16} color={colors.primary} />
-                  <Typography variant="body" style={styles.metaText}>
-                    {animeDetails.status}
-                  </Typography>
-                </View>
-              )}
-            </View>
-            <View style={styles.genreContainer}>
-              {animeDetails.genres?.map((genre, index) => (
-                <View key={index} style={styles.genre}>
-                  <Typography variant="caption" style={styles.genreText}>
-                    {genre}
-                  </Typography>
-                </View>
-              ))}
-            </View>
-          </View>
-        </View>
-
+        {/* Removed Anime Info block from here */}
+        
         {renderAnimeDetails()}
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -771,6 +758,9 @@ const styles = StyleSheet.create({
   },
   scrollView: {
     flex: 1,
+  },
+  scrollViewContent: { 
+    paddingBottom: Platform.OS === 'ios' ? 90 : 70, // Add padding for bottom navigation
   },
   coverImageContainer: {
     width: "100%",

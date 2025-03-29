@@ -1,5 +1,5 @@
 import React, { useEffect } from "react";
-import { View, StatusBar, Platform, ActivityIndicator } from "react-native";
+import { View, StatusBar, Platform, ActivityIndicator, StyleSheet } from "react-native";
 import { Slot, usePathname, useSegments } from "expo-router";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { ThemeProvider, useTheme } from "@/context/ThemeProvider";
@@ -47,10 +47,8 @@ function RootLayoutContent() {
 
   // Set status bar style based on theme
   useEffect(() => {
-    // Use the statusBar style from the theme
     StatusBar.setBarStyle(colors.statusBar === 'light-content' ? 'light-content' : 'dark-content');
-    StatusBar.setBackgroundColor(colors.background);
-  }, [colors]);
+  }, [colors.statusBar]);
 
   // Show loading indicator while checking authentication
   if (isCheckingAuth) {
@@ -61,36 +59,30 @@ function RootLayoutContent() {
     );
   }
 
+  // Check if we should show bottom navigation
+  const showBottomNavigation = !pathname.startsWith('/anime/') && !pathname.startsWith('/auth/');
+
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <View style={{ 
-        flex: 1, 
-        backgroundColor: colors.background,
-        // Add proper spacing for bottom navigation to avoid overlapping content
-        paddingBottom: Platform.OS === 'ios' ? 90 : 70 
-      }}>
-        <Slot />
-        {/* Only show bottom navigation on main screens */}
-        {["/", "/search", "/notifications", "/library", "/favorites", "/profile", "/anime/[id]"].includes(pathname) && (
-          <BottomNavigation 
-            currentRoute={pathname} 
-            style={{
-              position: 'absolute',
-              bottom: 0,
-              left: 0,
-              right: 0,
-              borderTopWidth: 1,
-              borderTopColor: colors.border,
-              backgroundColor: colors.card,
-              elevation: 8,
-              shadowColor: "#000",
-              shadowOffset: { width: 0, height: -2 },
-              shadowOpacity: 0.1,
-              shadowRadius: 4,
-            }}
-          />
-        )}
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <View style={showBottomNavigation ? styles.contentWithBottomNav : styles.contentWithoutBottomNav}>
+          <Slot />
+        </View>
+        {showBottomNavigation && <BottomNavigation />}
       </View>
     </GestureHandlerRootView>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
+  contentWithBottomNav: {
+    flex: 1,
+    paddingBottom: Platform.OS === 'ios' ? 90 : 70, // Adjusted padding for different platforms
+  },
+  contentWithoutBottomNav: {
+    flex: 1,
+  },
+});

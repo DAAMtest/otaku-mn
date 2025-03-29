@@ -9,11 +9,31 @@ export interface Anime {
   id: string;
   title: string;
   imageUrl: string;
-  rating: number;
+  rating: number | null;
   description: string;
-  releaseDate: string;
+  releaseDate: string | null;
+  coverImageUrl: string | null;
+  releaseYear: number | null;
+  season: string | null;
+  status: string | null;
+  popularity: number | null;
   genres: string[];
   isFavorite: boolean;
+}
+
+export interface DatabaseAnime {
+  id: string;
+  title: string;
+  image_url: string;
+  rating: number | null;
+  description: string | null;
+  release_date: string | null;
+  cover_image_url: string | null;
+  release_year: number | null;
+  season: string | null;
+  status: string | null;
+  popularity: number | null;
+  anime_genres: Array<{ genres: { name: string } }>;
 }
 
 export function useAnimeSearch(userId: string | null) {
@@ -29,7 +49,7 @@ export function useAnimeSearch(userId: string | null) {
 
   // Debounced search function to prevent too many API calls
   const searchAnime = useCallback(
-    debounce(async (query: string, selectedGenres: string[] = []) => {
+    debounce(async (query: string, selectedGenres: string[] = [], minRating: number | null = null) => {
       setLoading(true);
       setError(null);
 
@@ -37,7 +57,20 @@ export function useAnimeSearch(userId: string | null) {
         let animeQuery = supabase
           .from("anime")
           .select(
-            "id, title, image_url: imageUrl, rating, description, release_date: releaseDate, anime_genres!inner(genres(name))"
+            `
+              id,
+              title,
+              image_url as imageUrl,
+              rating,
+              description,
+              release_date as releaseDate,
+              cover_image_url as coverImageUrl,
+              release_year as releaseYear,
+              season,
+              status,
+              popularity,
+              anime_genres!inner(genres(name))
+            `
           );
 
         // Add title search if query is provided
@@ -47,36 +80,44 @@ export function useAnimeSearch(userId: string | null) {
 
         // Add genre filters if any are selected
         if (selectedGenres.length > 0) {
-          animeQuery = animeQuery
-            .in("anime_genres.genres.name", selectedGenres)
-            .order("rating", { ascending: false });
-        } else {
-          animeQuery = animeQuery.order("rating", { ascending: false });
+          animeQuery = animeQuery.in("anime_genres.genres.name", selectedGenres);
         }
 
-        const { data, error } = await animeQuery.limit(20);
+        // Add rating filter if provided
+        if (minRating !== null) {
+          animeQuery = animeQuery.gte("rating", minRating);
+        }
+
+        // Order by popularity (descending) and title (ascending)
+        animeQuery = animeQuery.order("popularity", { ascending: false }).order("title", { ascending: true });
+
+        const { data, error } = await animeQuery;
 
         if (error) throw error;
 
-        const formattedAnime = (data || []).map((item: any) => ({
-          id: item.id,
-          title: item.title,
-          imageUrl: item.imageUrl,
-          rating: item.rating || 0,
-          description: item.description,
-          releaseDate: item.releaseDate,
-          genres: item.anime_genres?.map((g: any) => g.genres.name) || [],
-          isFavorite: false,
-        }));
+        const formattedResults = data?.map((anime: DatabaseAnime) => ({
+          id: anime.id,
+          title: anime.title,
+          imageUrl: anime.image_url,
+          rating: anime.rating,
+          description: anime.description || '',
+          releaseDate: anime.release_date,
+          coverImageUrl: anime.cover_image_url,
+          releaseYear: anime.release_year,
+          season: anime.season,
+          status: anime.status,
+          popularity: anime.popularity,
+          genres: anime.anime_genres?.map((genre) => genre.genres.name) || [],
+          isFavorite: false
+        })) || [];
 
-        setSearchResults(formattedAnime);
+        setSearchResults(formattedResults);
       } catch (err) {
-        console.error("Error searching anime:", err);
-        setError(err as Error);
+        setError(err instanceof Error ? err : new Error("Failed to fetch anime"));
       } finally {
         setLoading(false);
       }
-    }, 300),
+    }, 500),
     [],
   );
 

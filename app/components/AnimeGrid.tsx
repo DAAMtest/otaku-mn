@@ -16,12 +16,11 @@ import { router } from "expo-router";
 import { Anime } from "@/hooks/useAnimeSearch";
 
 interface AnimeGridProps {
-  anime: Anime[];
-  isLoading: boolean;
-  isRefreshing: boolean;
-  onPress: (anime: Anime) => void;
+  animeList: Anime[];
+  onAnimePress: (anime: Anime) => void;
   onAddToList: (anime: Anime) => Promise<void>;
   onFavorite: (anime: Anime) => Promise<void>;
+  refreshing: boolean;
   onRefresh: () => Promise<void>;
   numColumns: number;
 }
@@ -34,13 +33,12 @@ interface AnimeGridProps {
  * @returns AnimeGrid component
  */
 const AnimeGrid = ({
-  anime,
-  isLoading,
-  isRefreshing,
-  onRefresh,
-  onPress,
+  animeList,
+  onAnimePress,
   onAddToList,
   onFavorite,
+  refreshing,
+  onRefresh,
   numColumns,
 }: AnimeGridProps) => {
   const { colors } = useTheme();
@@ -56,17 +54,17 @@ const AnimeGrid = ({
       <AnimeCard
         id={item.id}
         title={item.title}
-        imageUrl={item.imageUrl}
-        rating={item.rating}
+        imageUrl={item.imageUrl || ""}
+        rating={item.rating || 0}
         isFavorite={item.isFavorite}
-        onPress={() => onPress(item)}
+        onPress={() => onAnimePress(item)}
         onFavoritePress={() => onFavorite(item)}
         onAddToListPress={() => onAddToList(item)}
         width={cardWidth - cardSpacing}
         height={(cardWidth - cardSpacing) * 1.5}
         releaseYear={item.releaseDate ? new Date(item.releaseDate).getFullYear() : undefined}
         episodeCount={undefined}
-        isNew={isNewRelease(item.releaseDate)}
+        isNew={isNewRelease(item.releaseDate || undefined)}
       />
     </View>
   );
@@ -95,7 +93,7 @@ const AnimeGrid = ({
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <FlatList
-        data={anime}
+        data={animeList}
         renderItem={renderItem}
         keyExtractor={keyExtractor}
         numColumns={numColumns}
@@ -106,7 +104,7 @@ const AnimeGrid = ({
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
-            refreshing={isRefreshing}
+            refreshing={refreshing}
             onRefresh={onRefresh}
             colors={[colors.primary]}
             tintColor={colors.primary}
@@ -114,7 +112,7 @@ const AnimeGrid = ({
         }
         ListEmptyComponent={renderEmpty}
         ListFooterComponent={
-          isLoading ? (
+          refreshing ? (
             <ActivityIndicator 
               size="large" 
               color={colors.primary}

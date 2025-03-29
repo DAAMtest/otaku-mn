@@ -27,7 +27,17 @@ interface FilterBarProps {
 interface AuthModalProps {
   visible: boolean;
   onClose: () => void;
-  onLogin: () => Promise<void>;
+  onLogin: (email: string, password: string) => Promise<void>;
+  onRegister: (email: string, password: string, username: string) => void;
+  onSocialLogin: (provider: string) => void;
+}
+
+interface MenuDrawerProps {
+  visible: boolean;
+  onClose: () => void;
+  isAuthenticated: boolean;
+  username: string;
+  onMenuItemPress: (item: string) => void;
 }
 
 const HomeScreen = () => {
@@ -42,7 +52,7 @@ const HomeScreen = () => {
     "desc",
   );
   const [animeList, setAnimeList] = useState<Anime[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [topAnime, setTopAnime] = useState<Anime[]>([]);
   const { user } = useAuth();
@@ -59,182 +69,138 @@ const HomeScreen = () => {
     fetchNewReleases,
   } = useAnimeData();
 
-  // Define filter options based on fetched genres
-  const filterOptions = useMemo<FilterOption[]>(
-    () =>
-      genres.map((genre) => ({
-        id: genre.toLowerCase().replace(/\s+/g, "-"),
-        label: genre,
-        icon: "tag",
-      })),
-    [genres]
-  );
+  // Initialize filter options from genres
+  const filterOptions = useMemo(() => {
+    return genres.map(genre => ({
+      id: genre,
+      label: genre,
+      icon: "tag"
+    }));
+  }, [genres]);
 
-  // Handle search button press
-  const handleSearchPress = () => {
-    router.push("/search");
-  };
+  // Fetch genres when component mounts
+  useEffect(() => {
+    fetchGenres();
+  }, []); // Empty dependency array to prevent infinite loop
 
-  // Handle notifications button press
-  const handleNotificationsPress = () => {
-    router.push("/notifications");
-  };
+  // Handle filter option press
+  const handleFilterPress = useCallback((option: FilterOption) => {
+    const genreId = option.id;
+    setSelectedGenres(prev => 
+      prev.includes(genreId) 
+        ? prev.filter(id => id !== genreId) 
+        : [...prev, genreId]
+    );
+  }, []);
 
-  // Get current route for bottom navigation
-  const currentRoute = useMemo(() => {
-    if (pathname === "/") return "/";
-    if (pathname.startsWith("/search")) return "/search";
-    if (pathname.startsWith("/favorites")) return "/favorites";
-    if (pathname.startsWith("/profile")) return "/profile";
-    return "/";
-  }, [pathname]);
+  // Load anime when filters change
+  useEffect(() => {
+    loadAnime();
+  }, [selectedGenres, currentSortOrder]);
 
-  // Use useMemo for filtered and sorted anime list instead of state
-  const filteredAnimeList = useMemo(() => {
-    let result = [...animeList];
+  // Search function
+  const searchAnime = useCallback(
+    async (query: string, selectedGenres: string[] = []) => {
+      try {
+        setIsLoading(true);
+        
+        let queryBuilder = supabase
+          .from("anime")
+          .select(`
+            id,
+            title,
+            image_url,
+            rating,
+            description,
+            release_date,
+            cover_image_url,
+            release_year,
+            season,
+            status,
+            popularity,
+            anime_genres!inner(genres(name))
+          `);
 
-    // Apply genre filters if any are selected
-    if (selectedGenres.length > 0) {
-      result = result.filter((anime) =>
-        anime.genres?.some((genre) => selectedGenres.includes(genre)),
-      );
-    }
+        if (query.trim()) {
+          queryBuilder = queryBuilder.ilike("title", `%${query}%`);
+        }
 
-    // Apply sorting
-    return result.sort((a, b) => {
-      const aRating = a.rating ?? 0;
-      const bRating = b.rating ?? 0;
-      if (currentSortOrder === "asc") {
-        return aRating - bRating;
-      } else {
-        return bRating - aRating;
-      }
-    });
-  }, [animeList, selectedGenres, currentSortOrder]);
+        if (selectedGenres.length > 0) {
+          queryBuilder = queryBuilder
+            .in("anime_genres.genres.name", selectedGenres);
+        }
 
-  const loadAnime = async () => {
-    try {
-      const { data, error } = await supabase
-        .from("anime")
-        .select(`
-          id,
-          title,
-          description,
-          image_url,
-          cover_image_url,
-          release_date,
-          rating,
-          anime_genres!inner(genres(name))
-        `)
-        .order("created_at", { ascending: false });
+        queryBuilder = queryBuilder
+          .order("popularity", { ascending: false })
+          .order("title", { ascending: true });
 
-      if (error) throw error;
+        const { data, error } = await queryBuilder;
 
-      if (data) {
-        const formattedData: Anime[] = (data || []).map((item: any) => ({
+        if (error) throw error;
+
+        const formattedData = (data || []).map((item: {
+          id: string;
+          title: string;
+          image_url: string;
+          rating: number | null;
+          description: string | null;
+          release_date: string | null;
+          cover_image_url: string | null;
+          release_year: number | null;
+          season: string | null;
+          status: string | null;
+          popularity: number | null;
+          anime_genres: Array<{ genres: { name: string } | null } | null>;
+        }) => ({
           id: item.id,
           title: item.title,
           imageUrl: item.image_url,
           rating: item.rating || 0,
-          description: item.description ?? "",
-          releaseDate: item.release_date ?? "",
-          genres: Array.isArray(item.anime_genres) 
-            ? item.anime_genres.map((ag: any) => 
-                ag.genres && typeof ag.genres === 'object' 
-                  ? ag.genres.name 
-                  : null
-              ).filter(Boolean)
-            : [],
-          isFavorite: false // Default to false since is_favorite doesn't exist
+          description: item.description || "",
+          releaseDate: item.release_date,
+          coverImageUrl: item.cover_image_url,
+          releaseYear: item.release_year,
+          season: item.season,
+          status: item.status,
+          popularity: item.popularity,
+          genres: (item.anime_genres || []).map((ag) => 
+            ag && ag.genres && ag.genres.name ? ag.genres.name : null
+          ).filter((name): name is string => name !== null),
+          isFavorite: false,
         }));
-        setAnimeList(formattedData);
-      }
-    } catch (error) {
-      console.error("Error loading anime:", error);
-      Alert.alert("Error", "Failed to load anime list");
-    } finally {
-      setIsLoading(false);
-      setIsRefreshing(false);
-    }
-  };
 
-  // Use useEffect to fetch genres when component mounts
-  useEffect(() => {
-    const initializeData = async () => {
-      setIsLoading(true);
-      try {
-        await Promise.all([
-          loadAnime(),
-          fetchGenres()
-        ]);
-        console.log("Genres loaded:", genres);
+        setTopAnime(formattedData);
+        return formattedData;
       } catch (error) {
-        console.error("Error initializing data:", error);
+        console.error("Error in searchAnime:", error);
+        Alert.alert("Error", "Failed to search anime");
+        return [];
       } finally {
         setIsLoading(false);
       }
-    };
-    
-    initializeData();
+    },
+    []
+  );
+
+  // Update anime list when search results change
+  useEffect(() => {
+    setAnimeList(topAnime);
+  }, [topAnime]);
+
+  // Initialize anime list on mount
+  useEffect(() => {
+    loadAnime();
   }, []);
 
-  // Add debug logging for filter options
-  useEffect(() => {
-    console.log("Filter options:", filterOptions);
-    console.log("Selected genres:", selectedGenres);
-  }, [filterOptions, selectedGenres]);
-
-  const handleAddToList = async (anime: Anime, listType: string) => {
-    if (!user) {
-      setShowAuthModal(true);
-      return;
-    }
-
-    try {
-      const { error } = await supabase
-        .from("user_anime_list")
-        .insert({
-          user_id: user.id,
-          anime_id: anime.id,
-          list_type: listType,
-          progress: 0
-        })
-        .select();
-
-      if (error) throw error;
-
-      Alert.alert("Success", "Anime added to your list!");
-    } catch (error) {
-      console.error("Error adding to list:", error);
-      Alert.alert("Error", "Failed to add anime to list");
-    }
-  };
-
-  const handleFavorite = async (anime: Anime) => {
-    if (!user) {
-      setShowAuthModal(true);
-      return;
-    }
-
-    try {
-      const { error } = await supabase
-        .from("user_anime_list")
-        .insert({
-          user_id: user.id,
-          anime_id: anime.id,
-          list_type: "favorites",
-          progress: 0
-        })
-        .select();
-
-      if (error) throw error;
-
-      Alert.alert("Success", "Anime added to favorites!");
-    } catch (error) {
-      console.error("Error adding to favorites:", error);
-      Alert.alert("Error", "Failed to add anime to favorites");
-    }
-  };
+  // Handle anime press
+  const handleAnimePress = useCallback(
+    (anime: Anime) => {
+      console.log(`Anime pressed: ${anime.id}`);
+      // Navigate to anime details page
+      router.push(`/anime/${anime.id}`);
+    },
+    [router],
+  );
 
   // Handle user profile press
   const handleProfilePress = () => {
@@ -252,7 +218,7 @@ const HomeScreen = () => {
   };
 
   // Handle menu item press
-  const handleMenuItemPress = (item: string) => {
+  const handleMenuItemPress: MenuDrawerProps['onMenuItemPress'] = (item) => {
     setShowMenuDrawer(false);
 
     switch (item) {
@@ -369,81 +335,172 @@ const HomeScreen = () => {
     Alert.alert("Success", `You have successfully logged in with ${provider}!`);
   };
 
-  // Handle anime press
-  const handleAnimePress = useCallback(
-    (anime: Anime) => {
-      console.log(`Anime pressed: ${anime.id}`);
-      // Navigate to anime details page
-      router.push(`/anime/${anime.id}`);
-    },
-    [router],
-  );
+  // Handle add to list
+  const handleAddToList = async (anime: Anime, listType: string) => {
+    if (!user) {
+      setShowAuthModal(true);
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from("user_anime_list")
+        .insert({
+          user_id: user.id,
+          anime_id: anime.id,
+          list_type: listType,
+          progress: 0
+        })
+        .select();
+
+      if (error) throw error;
+
+      Alert.alert("Success", "Anime added to your list!");
+    } catch (error) {
+      console.error("Error adding to list:", error);
+      Alert.alert("Error", "Failed to add anime to list");
+    }
+  };
+
+  // Handle favorite
+  const handleFavorite = async (anime: Anime) => {
+    if (!user) {
+      setShowAuthModal(true);
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from("user_anime_favorites")
+        .insert({
+          user_id: user.id,
+          anime_id: anime.id
+        })
+        .select();
+
+      if (error) throw error;
+
+      Alert.alert("Success", "Anime added to favorites!");
+    } catch (error) {
+      console.error("Error adding to favorites:", error);
+      Alert.alert("Error", "Failed to add anime to favorites");
+    }
+  };
+
+  const loadAnime = async () => {
+    try {
+      setIsLoading(true);
+      
+      let queryBuilder = supabase
+        .from("anime")
+        .select(`
+          id,
+          title,
+          image_url,
+          rating,
+          description,
+          release_date,
+          cover_image_url,
+          release_year,
+          season,
+          status,
+          popularity,
+          anime_genres!inner(genres(name))
+        `);
+
+      // Apply genre filter if genres are selected
+      if (selectedGenres.length > 0) {
+        queryBuilder = queryBuilder
+          .in("anime_genres.genres.name", selectedGenres);
+      }
+
+      // Apply sort order
+      queryBuilder = queryBuilder
+        .order("popularity", { ascending: currentSortOrder === "asc" })
+        .order("title", { ascending: true });
+
+      const { data, error } = await queryBuilder;
+
+      if (error) throw error;
+
+      const formattedData = (data || []).map((item: {
+        id: string;
+        title: string;
+        image_url: string;
+        rating: number | null;
+        description: string | null;
+        release_date: string | null;
+        cover_image_url: string | null;
+        release_year: number | null;
+        season: string | null;
+        status: string | null;
+        popularity: number | null;
+        anime_genres: Array<{ genres: { name: string } | null } | null>;
+      }) => ({
+        id: item.id,
+        title: item.title,
+        imageUrl: item.image_url,
+        rating: item.rating || 0,
+        description: item.description || "",
+        releaseDate: item.release_date,
+        coverImageUrl: item.cover_image_url,
+        releaseYear: item.release_year,
+        season: item.season,
+        status: item.status,
+        popularity: item.popularity,
+        genres: (item.anime_genres || []).map((ag) => 
+          ag && ag.genres && ag.genres.name ? ag.genres.name : null
+        ).filter((name): name is string => name !== null),
+        isFavorite: false,
+      }));
+
+      setAnimeList(formattedData);
+    } catch (error) {
+      console.error("Error loading anime:", error);
+      Alert.alert("Error", "Failed to load anime list");
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   return (
     <SafeAreaView style={styles.container}>
       <Header
-        title="Home"
-        showSearch
-        showNotifications
-        onSearchPress={handleSearchPress}
-        onNotificationsPress={handleNotificationsPress}
+        onSearchPress={() => router.push("/search")}
+        onNotificationsPress={() => Alert.alert("Notifications", "You have no new notifications")}
       />
       
       <FilterBar
         options={filterOptions}
         selectedOptions={selectedGenres}
-        onOptionPress={(option: FilterOption) => {
-          setSelectedGenres((prev) =>
-            prev.includes(option.id)
-              ? prev.filter((id) => id !== option.id)
-              : [...prev, option.id]
-          );
-        }}
+        onOptionPress={handleFilterPress}
+        isLoading={Object.values(animeDataLoading).some(loading => loading)}
       />
-      
+
       <AnimeGrid
-        anime={filteredAnimeList}
-        isLoading={isLoading}
-        isRefreshing={isRefreshing}
-        onRefresh={async () => {
-          setIsRefreshing(true);
-          await loadAnime();
-          setIsRefreshing(false);
-          return Promise.resolve();
-        }}
-        onPress={(anime) => {
-          router.push({
-            pathname: `/anime/${anime.id}`,
-            params: { animeId: anime.id },
-          });
-        }}
+        animeList={animeList}
+        onAnimePress={handleAnimePress}
         onAddToList={(anime) => handleAddToList(anime, "watchlist")}
-        onFavorite={(anime) => handleFavorite(anime)}
+        onFavorite={handleFavorite}
+        refreshing={isRefreshing}
+        onRefresh={loadAnime}
         numColumns={2}
       />
-      
+
       <AuthModal
         visible={showAuthModal}
         onClose={() => setShowAuthModal(false)}
-        onLogin={async () => {
-          setShowAuthModal(false);
-          setIsAuthenticated(true);
-          setUsername(user?.user_metadata?.username || "Guest");
-          return Promise.resolve();
-        }}
+        onLogin={handleLogin}
+        onRegister={handleRegister}
+        onSocialLogin={handleSocialLogin}
       />
-      
+
       <MenuDrawer
         visible={showMenuDrawer}
         onClose={() => setShowMenuDrawer(false)}
-        onMenuItemPress={handleMenuItemPress}
         isAuthenticated={isAuthenticated}
         username={username}
-        avatarUrl={
-          isAuthenticated
-            ? `https://api.dicebear.com/7.x/avataaars/svg?seed=${username}`
-            : undefined
-        }
+        onMenuItemPress={handleMenuItemPress}
       />
     </SafeAreaView>
   );
