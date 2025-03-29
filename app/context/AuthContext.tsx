@@ -1,7 +1,13 @@
-import { createContext, useContext, useEffect, useState, type PropsWithChildren } from 'react';
-import { Session, User } from '@supabase/supabase-js';
-import { supabase } from '@/lib/supabase';
-import * as SecureStore from 'expo-secure-store';
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+  type PropsWithChildren,
+} from "react";
+import { Session, User } from "@supabase/supabase-js";
+import { supabase } from "@/lib/supabase";
+import * as SecureStore from "expo-secure-store";
 
 interface AuthContextType {
   user: User | null;
@@ -34,15 +40,19 @@ export default function AuthProvider({ children }: PropsWithChildren) {
     // Check for stored session
     const loadSession = async () => {
       try {
-        const storedSession = await SecureStore.getItemAsync('supabase-session');
+        const storedSession =
+          await SecureStore.getItemAsync("supabase-session");
         if (storedSession) {
-          const { data: { session }, error } = await supabase.auth.setSession(JSON.parse(storedSession));
+          const {
+            data: { session },
+            error,
+          } = await supabase.auth.setSession(JSON.parse(storedSession));
           if (error) throw error;
           setSession(session);
           setUser(session?.user ?? null);
         }
       } catch (error) {
-        console.error('Error loading session:', error);
+        console.error("Error loading session:", error);
       } finally {
         setIsLoading(false);
       }
@@ -51,16 +61,21 @@ export default function AuthProvider({ children }: PropsWithChildren) {
     loadSession();
 
     // Listen for auth state changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(async (event, session) => {
       setSession(session);
       setUser(session?.user ?? null);
       setIsLoading(false);
 
       // Store session securely
       if (session) {
-        await SecureStore.setItemAsync('supabase-session', JSON.stringify(session));
+        await SecureStore.setItemAsync(
+          "supabase-session",
+          JSON.stringify(session),
+        );
       } else {
-        await SecureStore.deleteItemAsync('supabase-session');
+        await SecureStore.deleteItemAsync("supabase-session");
       }
     });
 
@@ -85,11 +100,26 @@ export default function AuthProvider({ children }: PropsWithChildren) {
   const signUp = async (email: string, password: string) => {
     setIsLoading(true);
     try {
-      const { error } = await supabase.auth.signUp({
+      const { error, data } = await supabase.auth.signUp({
         email,
         password,
       });
       if (error) throw error;
+
+      // Create a user profile in the users table if signup was successful
+      if (data.user) {
+        const username = email.split("@")[0];
+        const { error: profileError } = await supabase.from("users").insert({
+          id: data.user.id,
+          username,
+          avatar_url: `https://api.dicebear.com/7.x/avataaars/svg?seed=${username}`,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        });
+
+        if (profileError)
+          console.error("Error creating user profile:", profileError);
+      }
     } finally {
       setIsLoading(false);
     }

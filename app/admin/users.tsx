@@ -314,7 +314,7 @@ export default function UserManagement() {
         {/* User List */}
         {loading ? (
           <View className="flex-1 items-center justify-center">
-            <ActivityIndicator size="large" color="#6366F1" />
+            <ActivityIndicator size="large" color="#40C057" />
             <Text className="text-gray-400 mt-4">Loading users...</Text>
           </View>
         ) : (

@@ -148,7 +148,7 @@ export default function AnalyticsDashboard() {
 
         {loading ? (
           <View className="flex-1 items-center justify-center">
-            <ActivityIndicator size="large" color="#6366F1" />
+            <ActivityIndicator size="large" color="#40C057" />
             <Text className="text-gray-400 mt-4">
               Loading analytics data...
             </Text>
@@ -158,7 +158,7 @@ export default function AnalyticsDashboard() {
             {/* Time Range Selector */}
             <View className="flex-row bg-gray-800 rounded-lg p-1 mb-4">
               <TouchableOpacity
-                className={`flex-1 py-2 rounded-md ${timeRange === "week" ? "bg-indigo-600" : ""}`}
+                className={`flex-1 py-2 rounded-md ${timeRange === "week" ? "bg-green-600" : ""}`}
                 onPress={() => setTimeRange("week")}
               >
                 <Text
@@ -168,7 +168,7 @@ export default function AnalyticsDashboard() {
                 </Text>
               </TouchableOpacity>
               <TouchableOpacity
-                className={`flex-1 py-2 rounded-md ${timeRange === "month" ? "bg-indigo-600" : ""}`}
+                className={`flex-1 py-2 rounded-md ${timeRange === "month" ? "bg-green-600" : ""}`}
                 onPress={() => setTimeRange("month")}
               >
                 <Text
@@ -178,7 +178,7 @@ export default function AnalyticsDashboard() {
                 </Text>
               </TouchableOpacity>
               <TouchableOpacity
-                className={`flex-1 py-2 rounded-md ${timeRange === "year" ? "bg-indigo-600" : ""}`}
+                className={`flex-1 py-2 rounded-md ${timeRange === "year" ? "bg-green-600" : ""}`}
                 onPress={() => setTimeRange("year")}
               >
                 <Text
@@ -290,7 +290,7 @@ export default function AnalyticsDashboard() {
 
             {/* Export Data Button */}
             <TouchableOpacity
-              className="bg-indigo-600 rounded-lg py-3 items-center mb-6"
+              className="bg-green-600 rounded-lg py-3 items-center mb-6"
               onPress={() => {
                 // In a real app, this would export analytics data
                 alert("This would export analytics data in a real app");

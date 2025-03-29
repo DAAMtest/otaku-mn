@@ -1,5 +1,13 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
-import { View, SafeAreaView, StatusBar, Alert, Platform, Text, StyleSheet } from "react-native";
+import {
+  View,
+  SafeAreaView,
+  StatusBar,
+  Alert,
+  Platform,
+  Text,
+  StyleSheet,
+} from "react-native";
 import { useRouter, usePathname } from "expo-router";
 import Header from "@/components/Header";
 import FilterBar from "@/components/FilterBar";
@@ -71,10 +79,10 @@ const HomeScreen = () => {
 
   // Initialize filter options from genres
   const filterOptions = useMemo(() => {
-    return genres.map(genre => ({
+    return genres.map((genre) => ({
       id: genre,
       label: genre,
-      icon: "tag"
+      icon: "tag",
     }));
   }, [genres]);
 
@@ -86,10 +94,10 @@ const HomeScreen = () => {
   // Handle filter option press
   const handleFilterPress = useCallback((option: FilterOption) => {
     const genreId = option.id;
-    setSelectedGenres(prev => 
-      prev.includes(genreId) 
-        ? prev.filter(id => id !== genreId) 
-        : [...prev, genreId]
+    setSelectedGenres((prev) =>
+      prev.includes(genreId)
+        ? prev.filter((id) => id !== genreId)
+        : [...prev, genreId],
     );
   }, []);
 
@@ -103,10 +111,8 @@ const HomeScreen = () => {
     async (query: string, selectedGenres: string[] = []) => {
       try {
         setIsLoading(true);
-        
-        let queryBuilder = supabase
-          .from("anime")
-          .select(`
+
+        let queryBuilder = supabase.from("anime").select(`
             id,
             title,
             image_url,
@@ -126,8 +132,14 @@ const HomeScreen = () => {
         }
 
         if (selectedGenres.length > 0) {
-          queryBuilder = queryBuilder
-            .in("anime_genres.genres.name", selectedGenres);
+          // Filter anime that have ALL the selected genres
+          selectedGenres.forEach((genre) => {
+            queryBuilder = queryBuilder.filter(
+              "anime_genres.genres.name",
+              "eq",
+              genre,
+            );
+          });
         }
 
         queryBuilder = queryBuilder
@@ -138,36 +150,40 @@ const HomeScreen = () => {
 
         if (error) throw error;
 
-        const formattedData = (data || []).map((item: {
-          id: string;
-          title: string;
-          image_url: string;
-          rating: number | null;
-          description: string | null;
-          release_date: string | null;
-          cover_image_url: string | null;
-          release_year: number | null;
-          season: string | null;
-          status: string | null;
-          popularity: number | null;
-          anime_genres: Array<{ genres: { name: string } | null } | null>;
-        }) => ({
-          id: item.id,
-          title: item.title,
-          imageUrl: item.image_url,
-          rating: item.rating || 0,
-          description: item.description || "",
-          releaseDate: item.release_date,
-          coverImageUrl: item.cover_image_url,
-          releaseYear: item.release_year,
-          season: item.season,
-          status: item.status,
-          popularity: item.popularity,
-          genres: (item.anime_genres || []).map((ag) => 
-            ag && ag.genres && ag.genres.name ? ag.genres.name : null
-          ).filter((name): name is string => name !== null),
-          isFavorite: false,
-        }));
+        const formattedData = (data || []).map(
+          (item: {
+            id: string;
+            title: string;
+            image_url: string;
+            rating: number | null;
+            description: string | null;
+            release_date: string | null;
+            cover_image_url: string | null;
+            release_year: number | null;
+            season: string | null;
+            status: string | null;
+            popularity: number | null;
+            anime_genres: Array<{ genres: { name: string } | null } | null>;
+          }) => ({
+            id: item.id,
+            title: item.title,
+            imageUrl: item.image_url,
+            rating: item.rating || 0,
+            description: item.description || "",
+            releaseDate: item.release_date,
+            coverImageUrl: item.cover_image_url,
+            releaseYear: item.release_year,
+            season: item.season,
+            status: item.status,
+            popularity: item.popularity,
+            genres: (item.anime_genres || [])
+              .map((ag) =>
+                ag && ag.genres && ag.genres.name ? ag.genres.name : null,
+              )
+              .filter((name): name is string => name !== null),
+            isFavorite: false,
+          }),
+        );
 
         setTopAnime(formattedData);
         return formattedData;
@@ -179,7 +195,7 @@ const HomeScreen = () => {
         setIsLoading(false);
       }
     },
-    []
+    [],
   );
 
   // Update anime list when search results change
@@ -218,7 +234,7 @@ const HomeScreen = () => {
   };
 
   // Handle menu item press
-  const handleMenuItemPress: MenuDrawerProps['onMenuItemPress'] = (item) => {
+  const handleMenuItemPress: MenuDrawerProps["onMenuItemPress"] = (item) => {
     setShowMenuDrawer(false);
 
     switch (item) {
@@ -349,7 +365,7 @@ const HomeScreen = () => {
           user_id: user.id,
           anime_id: anime.id,
           list_type: listType,
-          progress: 0
+          progress: 0,
         })
         .select();
 
@@ -374,7 +390,7 @@ const HomeScreen = () => {
         .from("user_anime_favorites")
         .insert({
           user_id: user.id,
-          anime_id: anime.id
+          anime_id: anime.id,
         })
         .select();
 
@@ -390,10 +406,8 @@ const HomeScreen = () => {
   const loadAnime = async () => {
     try {
       setIsLoading(true);
-      
-      let queryBuilder = supabase
-        .from("anime")
-        .select(`
+
+      let queryBuilder = supabase.from("anime").select(`
           id,
           title,
           image_url,
@@ -410,8 +424,14 @@ const HomeScreen = () => {
 
       // Apply genre filter if genres are selected
       if (selectedGenres.length > 0) {
-        queryBuilder = queryBuilder
-          .in("anime_genres.genres.name", selectedGenres);
+        // Filter anime that have ALL the selected genres
+        selectedGenres.forEach((genre) => {
+          queryBuilder = queryBuilder.filter(
+            "anime_genres.genres.name",
+            "eq",
+            genre,
+          );
+        });
       }
 
       // Apply sort order
@@ -423,36 +443,40 @@ const HomeScreen = () => {
 
       if (error) throw error;
 
-      const formattedData = (data || []).map((item: {
-        id: string;
-        title: string;
-        image_url: string;
-        rating: number | null;
-        description: string | null;
-        release_date: string | null;
-        cover_image_url: string | null;
-        release_year: number | null;
-        season: string | null;
-        status: string | null;
-        popularity: number | null;
-        anime_genres: Array<{ genres: { name: string } | null } | null>;
-      }) => ({
-        id: item.id,
-        title: item.title,
-        imageUrl: item.image_url,
-        rating: item.rating || 0,
-        description: item.description || "",
-        releaseDate: item.release_date,
-        coverImageUrl: item.cover_image_url,
-        releaseYear: item.release_year,
-        season: item.season,
-        status: item.status,
-        popularity: item.popularity,
-        genres: (item.anime_genres || []).map((ag) => 
-          ag && ag.genres && ag.genres.name ? ag.genres.name : null
-        ).filter((name): name is string => name !== null),
-        isFavorite: false,
-      }));
+      const formattedData = (data || []).map(
+        (item: {
+          id: string;
+          title: string;
+          image_url: string;
+          rating: number | null;
+          description: string | null;
+          release_date: string | null;
+          cover_image_url: string | null;
+          release_year: number | null;
+          season: string | null;
+          status: string | null;
+          popularity: number | null;
+          anime_genres: Array<{ genres: { name: string } | null } | null>;
+        }) => ({
+          id: item.id,
+          title: item.title,
+          imageUrl: item.image_url,
+          rating: item.rating || 0,
+          description: item.description || "",
+          releaseDate: item.release_date,
+          coverImageUrl: item.cover_image_url,
+          releaseYear: item.release_year,
+          season: item.season,
+          status: item.status,
+          popularity: item.popularity,
+          genres: (item.anime_genres || [])
+            .map((ag) =>
+              ag && ag.genres && ag.genres.name ? ag.genres.name : null,
+            )
+            .filter((name): name is string => name !== null),
+          isFavorite: false,
+        }),
+      );
 
       setAnimeList(formattedData);
     } catch (error) {
@@ -467,14 +491,16 @@ const HomeScreen = () => {
     <SafeAreaView style={styles.container}>
       <Header
         onSearchPress={() => router.push("/search")}
-        onNotificationsPress={() => Alert.alert("Notifications", "You have no new notifications")}
+        onNotificationsPress={() =>
+          Alert.alert("Notifications", "You have no new notifications")
+        }
       />
-      
+
       <FilterBar
         options={filterOptions}
         selectedOptions={selectedGenres}
         onOptionPress={handleFilterPress}
-        isLoading={Object.values(animeDataLoading).some(loading => loading)}
+        isLoading={Object.values(animeDataLoading).some((loading) => loading)}
       />
 
       <AnimeGrid

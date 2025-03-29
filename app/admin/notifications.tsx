@@ -326,7 +326,7 @@ export default function NotificationManagement() {
         {/* Notification List */}
         {loading ? (
           <View className="flex-1 items-center justify-center">
-            <ActivityIndicator size="large" color="#6366F1" />
+            <ActivityIndicator size="large" color="#40C057" />
             <Text className="text-gray-400 mt-4">Loading notifications...</Text>
           </View>
         ) : (
@@ -343,7 +343,7 @@ export default function NotificationManagement() {
                     : "No notifications available"}
                 </Text>
                 <TouchableOpacity
-                  className="mt-4 bg-blue-600 px-4 py-2 rounded-lg"
+                  className="mt-4 bg-green-600 px-4 py-2 rounded-lg"
                   onPress={handleAddNotification}
                 >
                   <Text className="text-white">Create New Notification</Text>
@@ -463,7 +463,7 @@ export default function NotificationManagement() {
               </ScrollView>
 
               <TouchableOpacity
-                className="bg-blue-600 rounded-lg py-3 items-center mt-4"
+                className="bg-green-600 rounded-lg py-3 items-center mt-4"
                 onPress={handleSendNotification}
               >
                 <View className="flex-row items-center">

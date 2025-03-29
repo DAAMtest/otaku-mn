@@ -58,7 +58,9 @@ const FilterBar = React.memo(function FilterBar({
   }, []);
 
   // Sort filters alphabetically
-  const sortedOptions = [...options].sort((a, b) => a.label.localeCompare(b.label));
+  const sortedOptions = [...options].sort((a, b) =>
+    a.label.localeCompare(b.label),
+  );
 
   // Create loading placeholders data
   const loadingPlaceholders = isLoading
@@ -92,27 +94,33 @@ const FilterBar = React.memo(function FilterBar({
               backgroundColor: isSelected
                 ? colors.primary
                 : isDarkMode
-                  ? "rgba(30, 41, 59, 0.95)"
+                  ? "rgba(19, 47, 76, 0.95)"
                   : "rgba(237, 242, 247, 0.9)",
               borderColor: isSelected
+                ? colors.primaryLight
+                : isDarkMode
+                  ? "rgba(64, 192, 87, 0.3)"
+                  : "rgba(203, 213, 225, 0.8)",
+              borderWidth: 2,
+              shadowColor: isSelected
                 ? colors.primary
                 : isDarkMode
-                  ? "rgba(51, 65, 85, 0.8)"
-                  : "rgba(203, 213, 225, 0.8)",
-              borderWidth: 1,
-              shadowColor: isDarkMode ? "rgba(0, 0, 0, 0.3)" : "rgba(0, 0, 0, 0.1)",
-              shadowOffset: { width: 0, height: 1 },
+                  ? "rgba(64, 192, 87, 0.4)"
+                  : "rgba(0, 0, 0, 0.1)",
+              shadowOffset: { width: 0, height: 2 },
               shadowOpacity: 0.8,
-              shadowRadius: 1,
-              elevation: 2,
+              shadowRadius: 3,
+              elevation: isSelected ? 4 : 2,
             },
           ]}
-          activeOpacity={0.7}
+          activeOpacity={0.6}
           accessibilityRole="button"
           accessibilityLabel={`Filter by ${option.label}`}
           accessibilityState={{ selected: isSelected }}
           accessibilityHint={
-            isSelected ? `Remove ${option.label} filter` : `Add ${option.label} filter`
+            isSelected
+              ? `Remove ${option.label} filter`
+              : `Add ${option.label} filter`
           }
         >
           <Text
@@ -124,7 +132,7 @@ const FilterBar = React.memo(function FilterBar({
                   : isDarkMode
                     ? "rgba(255, 255, 255, 0.9)"
                     : "rgba(15, 23, 42, 0.9)",
-                fontWeight: isSelected ? "600" : "500",
+                fontWeight: isSelected ? "700" : "500",
               },
             ]}
           >
@@ -150,7 +158,16 @@ const FilterBar = React.memo(function FilterBar({
   );
 
   return (
-    <View style={[styles.container, { backgroundColor: isDarkMode ? '#1E293B' : '#F1F5F9' }]}>
+    <View
+      style={[
+        styles.container,
+        {
+          backgroundColor: isDarkMode
+            ? "rgba(19, 47, 76, 0.8)"
+            : "rgba(241, 245, 249, 0.9)",
+        },
+      ]}
+    >
       {title && (
         <View style={styles.headerContainer}>
           <Text style={[styles.title, { color: colors.text }]}>{title}</Text>
@@ -159,11 +176,19 @@ const FilterBar = React.memo(function FilterBar({
               onPress={onFilterButtonPress}
               style={[
                 styles.filterIconButton,
-                { backgroundColor: colors.card },
+                {
+                  backgroundColor: isDarkMode
+                    ? "rgba(64, 192, 87, 0.15)"
+                    : "rgba(64, 192, 87, 0.1)",
+                  borderWidth: 1,
+                  borderColor: isDarkMode
+                    ? "rgba(64, 192, 87, 0.3)"
+                    : "rgba(64, 192, 87, 0.2)",
+                },
               ]}
-              activeOpacity={0.7}
+              activeOpacity={0.6}
             >
-              <FilterIcon size={16} color={colors.text} />
+              <FilterIcon size={18} color={colors.primary} />
             </TouchableOpacity>
           )}
         </View>
@@ -196,49 +221,60 @@ const FilterBar = React.memo(function FilterBar({
 
 const styles = StyleSheet.create({
   container: {
-    paddingTop: 8,
-    paddingBottom: 12,
+    paddingTop: 12,
+    paddingBottom: 16,
+    borderRadius: 16,
+    marginHorizontal: 8,
+    marginVertical: 8,
   },
   headerContainer: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
     paddingHorizontal: 16,
-    marginBottom: 12,
+    marginBottom: 14,
   },
   title: {
-    fontSize: 18,
-    fontWeight: "700",
+    fontSize: 20,
+    fontWeight: "800",
+    letterSpacing: 0.5,
   },
   filterList: {
     paddingHorizontal: 16,
-    paddingBottom: 4,
+    paddingBottom: 6,
   },
   filterButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 20,
+    paddingHorizontal: 18,
+    paddingVertical: 12,
+    borderRadius: 24,
+    elevation: 4,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3,
+  },
+  filterText: {
+    fontSize: 15,
+    fontWeight: "600",
+    letterSpacing: 0.3,
+  },
+  separator: {
+    width: 12,
+  },
+  filterIconButton: {
+    padding: 10,
+    borderRadius: 24,
     elevation: 3,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.2,
     shadowRadius: 2,
   },
-  filterText: {
-    fontSize: 14,
-  },
-  separator: {
-    width: 10,
-  },
-  filterIconButton: {
-    padding: 8,
-    borderRadius: 20,
-  },
   loadingPlaceholder: {
-    width: 80,
-    height: 36,
-    borderRadius: 20,
-    marginRight: 8,
+    width: 90,
+    height: 42,
+    borderRadius: 24,
+    marginRight: 10,
   },
 });
 

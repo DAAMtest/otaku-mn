@@ -1,6 +1,8 @@
 import React from "react";
 import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
 import { useRouter, usePathname } from "expo-router";
+import { useTheme } from "@/context/ThemeProvider";
+import Typography from "./Typography";
 import {
   Home,
   Film,
@@ -20,10 +22,17 @@ interface AdminNavigationProps {
 /**
  * AdminNavigation component provides consistent navigation across admin pages
  * with visual indication of the current active page.
+ * Uses Deku-inspired colors from My Hero Academia.
  */
 const AdminNavigation = ({ variant = "sidebar" }: AdminNavigationProps) => {
   const router = useRouter();
   const pathname = usePathname();
+  const { colors } = useTheme();
+
+  // Deku-inspired colors
+  const activeColor = colors.primary; // Deku's green
+  const activeBgColor = "bg-green-900/30";
+  const inactiveColor = "#9CA3AF";
 
   const navItems = [
     { id: "dashboard", label: "Dashboard", icon: Home, path: "/admin" },
@@ -74,9 +83,12 @@ const AdminNavigation = ({ variant = "sidebar" }: AdminNavigationProps) => {
               className="items-center px-2"
               onPress={() => router.push(item.path)}
             >
-              <IconComponent size={20} color={active ? "#8B5CF6" : "#9CA3AF"} />
+              <IconComponent
+                size={20}
+                color={active ? activeColor : inactiveColor}
+              />
               <Text
-                className={`text-xs mt-1 ${active ? "text-purple-400" : "text-gray-400"}`}
+                className={`text-xs mt-1 ${active ? "text-green-400" : "text-gray-400"}`}
               >
                 {item.label}
               </Text>
@@ -91,8 +103,15 @@ const AdminNavigation = ({ variant = "sidebar" }: AdminNavigationProps) => {
     <View className="w-64 bg-gray-800 h-full p-4">
       <View className="mb-6 px-4">
         <View className="flex-row items-center">
-          <Shield size={24} color="#8B5CF6" />
-          <Text className="text-white font-bold text-lg ml-2">Admin Panel</Text>
+          <Shield size={24} color={activeColor} />
+          <Typography
+            variant="h3"
+            color="#FFFFFF"
+            weight="700"
+            style={{ marginLeft: 8 }}
+          >
+            Admin Panel
+          </Typography>
         </View>
       </View>
 
@@ -103,15 +122,21 @@ const AdminNavigation = ({ variant = "sidebar" }: AdminNavigationProps) => {
           return (
             <TouchableOpacity
               key={item.id}
-              className={`flex-row items-center py-3 px-4 rounded-lg mb-1 ${active ? "bg-purple-900/30" : ""}`}
+              className={`flex-row items-center py-3 px-4 rounded-lg mb-1 ${active ? activeBgColor : ""}`}
               onPress={() => router.push(item.path)}
             >
-              <IconComponent size={20} color={active ? "#8B5CF6" : "#9CA3AF"} />
-              <Text
-                className={`ml-3 ${active ? "text-purple-400 font-medium" : "text-gray-300"}`}
+              <IconComponent
+                size={20}
+                color={active ? activeColor : inactiveColor}
+              />
+              <Typography
+                variant="body"
+                color={active ? colors.primary : "#E5E7EB"}
+                weight={active ? "600" : "400"}
+                style={{ marginLeft: 12 }}
               >
                 {item.label}
-              </Text>
+              </Typography>
             </TouchableOpacity>
           );
         })}
@@ -122,8 +147,10 @@ const AdminNavigation = ({ variant = "sidebar" }: AdminNavigationProps) => {
           className="flex-row items-center py-3 px-4 rounded-lg"
           onPress={() => router.push("/")}
         >
-          <Home size={20} color="#9CA3AF" />
-          <Text className="ml-3 text-gray-300">Back to App</Text>
+          <Home size={20} color={inactiveColor} />
+          <Typography variant="body" color="#E5E7EB" style={{ marginLeft: 12 }}>
+            Back to App
+          </Typography>
         </TouchableOpacity>
       </View>
     </View>
