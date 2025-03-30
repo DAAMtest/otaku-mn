@@ -6,7 +6,7 @@ export interface Database {
           id: string;
           username: string;
           avatar_url: string | null;
-          bio?: string | null;
+          bio: string | null;
           created_at: string | null;
           updated_at: string | null;
         };
@@ -83,6 +83,7 @@ export interface Database {
           id: string;
           anime_id: string;
           genre_id: string;
+          created_at: string | null;
           genres: {
             id: string;
             name: string;
@@ -92,89 +93,88 @@ export interface Database {
           id?: string;
           anime_id: string;
           genre_id: string;
+          created_at?: string | null;
         };
         Update: {
           id?: string;
           anime_id?: string;
           genre_id?: string;
+          created_at?: string | null;
         };
       };
       genres: {
         Row: {
           id: string;
           name: string;
-          created_at: string;
+          created_at: string | null;
         };
         Insert: {
           id?: string;
           name: string;
-          created_at?: string;
+          created_at?: string | null;
         };
         Update: {
           id?: string;
           name?: string;
-          created_at?: string;
+          created_at?: string | null;
         };
       };
       episodes: {
         Row: {
           id: string;
-          anime_id: string;
-          title: string;
+          anime_id: string | null;
+          title: string | null;
           description: string | null;
-          episode_number: number;
+          episode_number: number | null;
           video_url: string | null;
           thumbnail_url: string | null;
-          duration: number | null;
-          created_at: string;
-          updated_at: string;
+          duration: string | null;
+          created_at: string | null;
         };
         Insert: {
-          id?: string;
-          anime_id: string;
-          title: string;
+          id: string;
+          anime_id?: string | null;
+          title?: string | null;
           description?: string | null;
-          episode_number: number;
+          episode_number?: number | null;
           video_url?: string | null;
           thumbnail_url?: string | null;
-          duration?: number | null;
-          created_at?: string;
-          updated_at?: string;
+          duration?: string | null;
+          created_at?: string | null;
         };
         Update: {
           id?: string;
-          anime_id?: string;
-          title?: string;
+          anime_id?: string | null;
+          title?: string | null;
           description?: string | null;
-          episode_number?: number;
+          episode_number?: number | null;
           video_url?: string | null;
           thumbnail_url?: string | null;
-          duration?: number | null;
-          created_at?: string;
-          updated_at?: string;
+          duration?: string | null;
+          created_at?: string | null;
         };
       };
-      related_anime: {
+      anime_relations: {
         Row: {
           id: string;
-          anime_id: string;
-          related_anime_id: string;
-          relation_type: string;
-          created_at: string;
+          anime_id: string | null;
+          related_anime_id: string | null;
+          relation_type: string | null;
+          created_at: string | null;
         };
         Insert: {
           id?: string;
-          anime_id: string;
-          related_anime_id: string;
-          relation_type: string;
-          created_at?: string;
+          anime_id?: string | null;
+          related_anime_id?: string | null;
+          relation_type?: string | null;
+          created_at?: string | null;
         };
         Update: {
           id?: string;
-          anime_id?: string;
-          related_anime_id?: string;
-          relation_type?: string;
-          created_at?: string;
+          anime_id?: string | null;
+          related_anime_id?: string | null;
+          relation_type?: string | null;
+          created_at?: string | null;
         };
       };
       user_anime_lists: {
@@ -183,30 +183,30 @@ export interface Database {
           user_id: string;
           anime_id: string;
           list_type: string;
-          progress: number;
-          added_date: string;
-          created_at: string;
-          updated_at: string;
+          progress: number | null;
+          added_date: string | null;
+          created_at: string | null;
+          updated_at: string | null;
         };
         Insert: {
           id?: string;
           user_id: string;
           anime_id: string;
           list_type: string;
-          progress?: number;
-          added_date?: string;
-          created_at?: string;
-          updated_at?: string;
+          progress?: number | null;
+          added_date?: string | null;
+          created_at?: string | null;
+          updated_at?: string | null;
         };
         Update: {
           id?: string;
           user_id?: string;
           anime_id?: string;
           list_type?: string;
-          progress?: number;
-          added_date?: string;
-          created_at?: string;
-          updated_at?: string;
+          progress?: number | null;
+          added_date?: string | null;
+          created_at?: string | null;
+          updated_at?: string | null;
         };
       };
       watch_history: {
@@ -214,31 +214,22 @@ export interface Database {
           id: string;
           user_id: string;
           anime_id: string;
-          episode_id: string;
-          progress: number;
-          watched_at: string;
-          created_at: string;
-          updated_at: string;
+          watched_at: string | null;
+          created_at: string | null;
         };
         Insert: {
           id?: string;
           user_id: string;
           anime_id: string;
-          episode_id: string;
-          progress?: number;
-          watched_at?: string;
-          created_at?: string;
-          updated_at?: string;
+          watched_at?: string | null;
+          created_at?: string | null;
         };
         Update: {
           id?: string;
           user_id?: string;
           anime_id?: string;
-          episode_id?: string;
-          progress?: number;
-          watched_at?: string;
-          created_at?: string;
-          updated_at?: string;
+          watched_at?: string | null;
+          created_at?: string | null;
         };
       };
       notifications: {
@@ -248,8 +239,8 @@ export interface Database {
           title: string;
           message: string;
           is_read: boolean;
-          created_at: string;
-          updated_at: string;
+          created_at: string | null;
+          updated_at: string | null;
           type: string;
           related_id: string | null;
         };
@@ -259,8 +250,8 @@ export interface Database {
           title: string;
           message: string;
           is_read?: boolean;
-          created_at?: string;
-          updated_at?: string;
+          created_at?: string | null;
+          updated_at?: string | null;
           type?: string;
           related_id?: string | null;
         };
@@ -270,12 +261,24 @@ export interface Database {
           title?: string;
           message?: string;
           is_read?: boolean;
-          created_at?: string;
-          updated_at?: string;
+          created_at?: string | null;
+          updated_at?: string | null;
           type?: string;
           related_id?: string | null;
         };
       };
+    };
+    Views: {
+      [_ in never]: never;
+    };
+    Functions: {
+      [_ in never]: never;
+    };
+    Enums: {
+      [_ in never]: never;
+    };
+    CompositeTypes: {
+      [_ in never]: never;
     };
   };
 }

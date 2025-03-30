@@ -72,8 +72,14 @@ export function useAnimeSearch(userId: string | null) {
               season,
               status,
               popularity,
-              anime_genres!inner(genres(name))
-            `,
+              anime_genres (
+                genre_id,
+                genres (
+                  id,
+                  name
+                )
+              )
+            `
           );
 
           // Add title search if query is provided
@@ -83,14 +89,7 @@ export function useAnimeSearch(userId: string | null) {
 
           // Add genre filters if any are selected
           if (selectedGenres.length > 0) {
-            // Use contains() to filter anime that have ALL the selected genres
-            selectedGenres.forEach((genre) => {
-              animeQuery = animeQuery.filter(
-                "anime_genres.genres.name",
-                "eq",
-                genre,
-              );
-            });
+            animeQuery = animeQuery.in('anime_genres.genres.name', selectedGenres);
           }
 
           // Add rating filter if provided
@@ -157,7 +156,7 @@ export function useAnimeSearch(userId: string | null) {
       const { data, error } = await supabase
         .from("anime")
         .select(
-          "id, title, image_url: imageUrl, rating, description, release_date: releaseDate, anime_genres!inner(genres(name))",
+          "id, title, image_url, rating, description, release_date: releaseDate, anime_genres!inner(genres(name))",
         )
         .order("rating", { ascending: false })
         .limit(10);
@@ -167,7 +166,7 @@ export function useAnimeSearch(userId: string | null) {
       const formattedAnime = (data || []).map((item: any) => ({
         id: item.id,
         title: item.title,
-        imageUrl: item.imageUrl,
+        imageUrl: item.image_url,
         rating: item.rating || 0,
         description: item.description,
         releaseDate: item.releaseDate,

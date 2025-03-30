@@ -7,6 +7,7 @@ import {
   Platform,
   Text,
   StyleSheet,
+  ActivityIndicator,
 } from "react-native";
 import { useRouter, usePathname } from "expo-router";
 import Header from "@/components/Header";
@@ -19,6 +20,8 @@ import type { Database } from "@/lib/database.types";
 import useAnimeData from "@/hooks/useAnimeData";
 import { Anime } from "@/hooks/useAnimeSearch";
 import { supabase } from "@/lib/supabase";
+import BottomNavigation from "@/components/BottomNavigation";
+import * as SecureStore from "expo-secure-store";
 
 interface FilterOption {
   id: string;
@@ -51,19 +54,17 @@ interface MenuDrawerProps {
 const HomeScreen = () => {
   const router = useRouter();
   const pathname = usePathname();
+  const { user, session, isLoading: authLoading } = useAuth();
+
+  // State hooks
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [showMenuDrawer, setShowMenuDrawer] = useState(false);
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [username, setUsername] = useState("Guest");
   const [selectedGenres, setSelectedGenres] = useState<string[]>([]);
-  const [currentSortOrder, setCurrentSortOrder] = useState<"asc" | "desc">(
-    "desc",
-  );
+  const [currentSortOrder, setCurrentSortOrder] = useState<"asc" | "desc">("desc");
   const [animeList, setAnimeList] = useState<Anime[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const [topAnime, setTopAnime] = useState<Anime[]>([]);
-  const { user } = useAuth();
 
   // Get anime data from the hook
   const {
@@ -77,7 +78,120 @@ const HomeScreen = () => {
     fetchNewReleases,
   } = useAnimeData();
 
-  // Initialize filter options from genres
+  // Format anime data
+  const formatAnimeData = useCallback((data: any[]) => {
+    return data.map(item => {
+      const genres = item.anime_genres
+        ? item.anime_genres.map((ag: { genres: { name: string } }) => ag.genres.name)
+        : [];
+
+      return {
+        id: item.id,
+        title: item.title,
+        imageUrl: item.image_url,
+        rating: item.rating || 0,
+        description: item.description || "",
+        releaseDate: item.release_date,
+        coverImageUrl: item.cover_image_url,
+        releaseYear: item.release_year,
+        season: item.season,
+        status: item.status,
+        popularity: item.popularity,
+        genres,
+        isFavorite: false,
+      };
+    });
+  }, []);
+
+  // Load anime data
+  const loadAnime = useCallback(async (shouldRefresh = false) => {
+    if (isLoading && !shouldRefresh) return;
+    
+    try {
+      setIsLoading(true);
+      if (shouldRefresh) {
+        setIsRefreshing(true);
+      }
+
+      let query = supabase.from("anime").select(`
+        id,
+        title,
+        image_url,
+        rating,
+        description,
+        release_date,
+        cover_image_url,
+        release_year,
+        season,
+        status,
+        popularity,
+        anime_genres!inner (
+          genres!inner (
+            name
+          )
+        )
+      `);
+
+      if (selectedGenres.length > 0) {
+        query = query.in('anime_genres.genres.name', selectedGenres);
+      }
+
+      query = query.order("popularity", { ascending: currentSortOrder === "asc" })
+        .order("title", { ascending: true });
+
+      const { data, error } = await query;
+
+      if (error) throw error;
+
+      const formattedData = formatAnimeData(data || []);
+      setAnimeList(formattedData);
+    } catch (error) {
+      console.error("Error loading anime:", error);
+      Alert.alert("Error", "Failed to load anime list");
+    } finally {
+      setIsLoading(false);
+      setIsRefreshing(false);
+    }
+  }, [selectedGenres, currentSortOrder, formatAnimeData]);
+
+  // Initial data load
+  useEffect(() => {
+    if (!authLoading) {
+      fetchGenres();
+      loadAnime();
+    }
+  }, [authLoading]); // Only run when auth loading changes
+
+  // Handle filter changes
+  const handleFilterPress = useCallback((option: FilterOption) => {
+    if (isLoading) return; // Prevent multiple clicks while loading
+    const genreId = option.id;
+    setSelectedGenres(prev => {
+      const newGenres = prev.includes(genreId)
+        ? prev.filter(id => id !== genreId)
+        : [...prev, genreId];
+      return newGenres;
+    });
+  }, [isLoading]);
+
+  // Watch for filter changes and load data with debounce
+  useEffect(() => {
+    if (authLoading) return;
+
+    const timeoutId = setTimeout(() => {
+      loadAnime(true);
+    }, 100); // Small delay to batch multiple filter changes
+
+    return () => clearTimeout(timeoutId);
+  }, [selectedGenres, currentSortOrder]); // Remove loadAnime and authLoading from dependencies
+
+  // Handle sort order change
+  const handleSortOrderChange = useCallback((order: "asc" | "desc") => {
+    if (isLoading) return; // Prevent multiple clicks while loading
+    setCurrentSortOrder(order);
+  }, [isLoading]);
+
+  // Memoized values
   const filterOptions = useMemo(() => {
     return genres.map((genre) => ({
       id: genre,
@@ -86,144 +200,49 @@ const HomeScreen = () => {
     }));
   }, [genres]);
 
-  // Fetch genres when component mounts
-  useEffect(() => {
-    fetchGenres();
-  }, []); // Empty dependency array to prevent infinite loop
-
-  // Handle filter option press
-  const handleFilterPress = useCallback((option: FilterOption) => {
-    const genreId = option.id;
-    setSelectedGenres((prev) =>
-      prev.includes(genreId)
-        ? prev.filter((id) => id !== genreId)
-        : [...prev, genreId],
-    );
-  }, []);
-
-  // Load anime when filters change
-  useEffect(() => {
-    loadAnime();
-  }, [selectedGenres, currentSortOrder]);
-
-  // Search function
-  const searchAnime = useCallback(
-    async (query: string, selectedGenres: string[] = []) => {
-      try {
-        setIsLoading(true);
-
-        let queryBuilder = supabase.from("anime").select(`
-            id,
-            title,
-            image_url,
-            rating,
-            description,
-            release_date,
-            cover_image_url,
-            release_year,
-            season,
-            status,
-            popularity,
-            anime_genres!inner(genres(name))
-          `);
-
-        if (query.trim()) {
-          queryBuilder = queryBuilder.ilike("title", `%${query}%`);
-        }
-
-        if (selectedGenres.length > 0) {
-          // Filter anime that have ALL the selected genres
-          selectedGenres.forEach((genre) => {
-            queryBuilder = queryBuilder.filter(
-              "anime_genres.genres.name",
-              "eq",
-              genre,
-            );
-          });
-        }
-
-        queryBuilder = queryBuilder
-          .order("popularity", { ascending: false })
-          .order("title", { ascending: true });
-
-        const { data, error } = await queryBuilder;
-
-        if (error) throw error;
-
-        const formattedData = (data || []).map(
-          (item: {
-            id: string;
-            title: string;
-            image_url: string;
-            rating: number | null;
-            description: string | null;
-            release_date: string | null;
-            cover_image_url: string | null;
-            release_year: number | null;
-            season: string | null;
-            status: string | null;
-            popularity: number | null;
-            anime_genres: Array<{ genres: { name: string } | null } | null>;
-          }) => ({
-            id: item.id,
-            title: item.title,
-            imageUrl: item.image_url,
-            rating: item.rating || 0,
-            description: item.description || "",
-            releaseDate: item.release_date,
-            coverImageUrl: item.cover_image_url,
-            releaseYear: item.release_year,
-            season: item.season,
-            status: item.status,
-            popularity: item.popularity,
-            genres: (item.anime_genres || [])
-              .map((ag) =>
-                ag && ag.genres && ag.genres.name ? ag.genres.name : null,
-              )
-              .filter((name): name is string => name !== null),
-            isFavorite: false,
-          }),
-        );
-
-        setTopAnime(formattedData);
-        return formattedData;
-      } catch (error) {
-        console.error("Error in searchAnime:", error);
-        Alert.alert("Error", "Failed to search anime");
-        return [];
-      } finally {
-        setIsLoading(false);
-      }
-    },
-    [],
-  );
-
-  // Update anime list when search results change
-  useEffect(() => {
-    setAnimeList(topAnime);
-  }, [topAnime]);
-
-  // Initialize anime list on mount
-  useEffect(() => {
-    loadAnime();
-  }, []);
-
-  // Handle anime press
   const handleAnimePress = useCallback(
     (anime: Anime) => {
       console.log(`Anime pressed: ${anime.id}`);
-      // Navigate to anime details page
       router.push(`/anime/${anime.id}`);
     },
     [router],
   );
 
+  // Check stored session only once on mount
+  useEffect(() => {
+    const checkStoredSession = async () => {
+      try {
+        const storedSession = await SecureStore.getItemAsync("supabase-session");
+        if (storedSession) {
+          const { data: { session: currentSession } } = await supabase.auth.getSession();
+          if (!currentSession) {
+            await SecureStore.deleteItemAsync("supabase-session");
+          }
+        }
+      } catch (error) {
+        console.error("Error checking stored session:", error);
+      }
+    };
+
+    checkStoredSession();
+  }, []);
+
+  // Show loading state while auth is being checked
+  if (authLoading) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#4F46E5" />
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   // Handle user profile press
   const handleProfilePress = () => {
-    if (!isAuthenticated) {
+    if (!user) {
       setShowAuthModal(true);
     } else {
-      // Navigate to profile page
       router.push("/profile");
     }
   };
@@ -245,14 +264,14 @@ const HomeScreen = () => {
         router.push("/search");
         break;
       case "lists":
-        if (isAuthenticated) {
+        if (user) {
           router.push("/lists");
         } else {
           setShowAuthModal(true);
         }
         break;
       case "profile":
-        if (isAuthenticated) {
+        if (user) {
           router.push("/profile");
         } else {
           setShowAuthModal(true);
@@ -265,13 +284,13 @@ const HomeScreen = () => {
         router.push("/new-releases");
         break;
       case "top_rated":
-        Alert.alert("Top Rated", "Top rated anime page is coming soon");
+        router.push("/top-rated");
         break;
       case "popular":
-        Alert.alert("Most Popular", "Most popular anime page is coming soon");
+        router.push("/popular");
         break;
       case "settings":
-        Alert.alert("Settings", "Settings page is under construction");
+        router.push("/settings");
         break;
       case "about":
         Alert.alert(
@@ -296,15 +315,13 @@ const HomeScreen = () => {
   // Handle login
   const handleLogin = async (email: string, password: string) => {
     try {
-      setIsLoading(true);
-      // In a real implementation, this would use the auth hook
-      // const { data, error } = await signIn(email, password);
-      // if (error) throw error;
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
 
-      // Simulate login for now
-      console.log(`Login with ${email} and ${password}`);
-      setIsAuthenticated(true);
-      setUsername(email.split("@")[0]); // Use part of email as username
+      if (error) throw error;
+
       setShowAuthModal(false);
       Alert.alert("Success", "You have successfully logged in!");
     } catch (error) {
@@ -315,38 +332,65 @@ const HomeScreen = () => {
           ? error.message
           : "Please check your credentials and try again",
       );
-    } finally {
-      setIsLoading(false);
     }
   };
 
   // Handle register
-  const handleRegister = (
-    email: string,
-    password: string,
-    username: string,
-  ) => {
-    // Simulate registration
-    console.log(`Register with ${email}, ${password}, and ${username}`);
-    setIsAuthenticated(true);
-    setUsername(username);
-    setShowAuthModal(false);
-    Alert.alert("Success", "Your account has been created successfully!");
+  const handleRegister = async (email: string, password: string, username: string) => {
+    try {
+      const { error: signUpError, data } = await supabase.auth.signUp({
+        email,
+        password,
+      });
+
+      if (signUpError) throw signUpError;
+
+      if (data.user) {
+        // Create user profile
+        const { error: profileError } = await supabase
+          .from('users')
+          .insert({
+            id: data.user.id,
+            username,
+            avatar_url: `https://api.dicebear.com/7.x/avataaars/svg?seed=${username}`,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          });
+
+        if (profileError) {
+          console.error("Error creating user profile:", profileError);
+        }
+      }
+
+      setShowAuthModal(false);
+      Alert.alert("Success", "Your account has been created successfully!");
+    } catch (error) {
+      console.error("Registration error:", error);
+      Alert.alert(
+        "Registration Failed",
+        error instanceof Error
+          ? error.message
+          : "An error occurred during registration"
+      );
+    }
   };
 
   // Handle logout
-  const handleLogout = () => {
-    setIsAuthenticated(false);
-    setUsername("Guest");
-    Alert.alert("Logged Out", "You have been logged out successfully");
+  const handleLogout = async () => {
+    try {
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
+      Alert.alert("Logged Out", "You have been logged out successfully");
+    } catch (error) {
+      console.error("Logout error:", error);
+      Alert.alert("Error", "Failed to log out");
+    }
   };
 
   // Handle social login
   const handleSocialLogin = (provider: string) => {
     // Simulate social login
     console.log(`Login with ${provider}`);
-    setIsAuthenticated(true);
-    setUsername(`${provider}_user`);
     setShowAuthModal(false);
     Alert.alert("Success", `You have successfully logged in with ${provider}!`);
   };
@@ -403,90 +447,6 @@ const HomeScreen = () => {
     }
   };
 
-  const loadAnime = async () => {
-    try {
-      setIsLoading(true);
-
-      let queryBuilder = supabase.from("anime").select(`
-          id,
-          title,
-          image_url,
-          rating,
-          description,
-          release_date,
-          cover_image_url,
-          release_year,
-          season,
-          status,
-          popularity,
-          anime_genres!inner(genres(name))
-        `);
-
-      // Apply genre filter if genres are selected
-      if (selectedGenres.length > 0) {
-        // Filter anime that have ALL the selected genres
-        selectedGenres.forEach((genre) => {
-          queryBuilder = queryBuilder.filter(
-            "anime_genres.genres.name",
-            "eq",
-            genre,
-          );
-        });
-      }
-
-      // Apply sort order
-      queryBuilder = queryBuilder
-        .order("popularity", { ascending: currentSortOrder === "asc" })
-        .order("title", { ascending: true });
-
-      const { data, error } = await queryBuilder;
-
-      if (error) throw error;
-
-      const formattedData = (data || []).map(
-        (item: {
-          id: string;
-          title: string;
-          image_url: string;
-          rating: number | null;
-          description: string | null;
-          release_date: string | null;
-          cover_image_url: string | null;
-          release_year: number | null;
-          season: string | null;
-          status: string | null;
-          popularity: number | null;
-          anime_genres: Array<{ genres: { name: string } | null } | null>;
-        }) => ({
-          id: item.id,
-          title: item.title,
-          imageUrl: item.image_url,
-          rating: item.rating || 0,
-          description: item.description || "",
-          releaseDate: item.release_date,
-          coverImageUrl: item.cover_image_url,
-          releaseYear: item.release_year,
-          season: item.season,
-          status: item.status,
-          popularity: item.popularity,
-          genres: (item.anime_genres || [])
-            .map((ag) =>
-              ag && ag.genres && ag.genres.name ? ag.genres.name : null,
-            )
-            .filter((name): name is string => name !== null),
-          isFavorite: false,
-        }),
-      );
-
-      setAnimeList(formattedData);
-    } catch (error) {
-      console.error("Error loading anime:", error);
-      Alert.alert("Error", "Failed to load anime list");
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   return (
     <SafeAreaView style={styles.container}>
       <Header
@@ -509,7 +469,7 @@ const HomeScreen = () => {
         onAddToList={(anime) => handleAddToList(anime, "watchlist")}
         onFavorite={handleFavorite}
         refreshing={isRefreshing}
-        onRefresh={loadAnime}
+        onRefresh={() => loadAnime(true)}
         numColumns={2}
       />
 
@@ -524,9 +484,15 @@ const HomeScreen = () => {
       <MenuDrawer
         visible={showMenuDrawer}
         onClose={() => setShowMenuDrawer(false)}
-        isAuthenticated={isAuthenticated}
-        username={username}
+        isAuthenticated={!!user}
+        username={user?.email?.split('@')[0] || 'Guest'}
         onMenuItemPress={handleMenuItemPress}
+      />
+
+      <BottomNavigation
+        currentRoute="/"
+        activeTab="home"
+        onTabChange={() => {}}
       />
     </SafeAreaView>
   );
@@ -536,6 +502,11 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#171717",
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });
 

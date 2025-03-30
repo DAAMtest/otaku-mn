@@ -15,8 +15,10 @@ import {
 } from "react-native";
 import { Feather } from '@expo/vector-icons';
 import { supabase } from '@/lib/supabase';
-import { useRouter } from 'expo-router';
+import { useRouter, usePathname } from 'expo-router';
 import { useTheme } from "@/context/ThemeProvider";
+import { useAuth } from "@/context/AuthContext";
+import * as SecureStore from 'expo-secure-store';
 
 interface AuthModalProps {
   visible?: boolean;
@@ -37,17 +39,36 @@ const AuthModal = ({
 }: AuthModalProps) => {
   const router = useRouter();
   const { colors, isDarkMode } = useTheme();
+  const { signIn, signUp, refreshSession } = useAuth();
   const [isLogin, setIsLogin] = useState(initialMode === 'login');
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [username, setUsername] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const pathname = usePathname();
+
+  // Log the current pathname to debug
+  useEffect(() => {
+    console.log('AuthModal - Current pathname:', pathname);
+  }, [pathname]);
 
   // Update mode if initialMode prop changes
   useEffect(() => {
     setIsLogin(initialMode === 'login');
   }, [initialMode]);
+
+  // Reset form and state when modal visibility changes
+  useEffect(() => {
+    if (visible) {
+      console.log('AuthModal - Modal became visible, resetting form');
+    } else {
+      // Reset form when modal closes
+      setEmail("");
+      setPassword("");
+      setUsername("");
+    }
+  }, [visible]);
 
   const handleSubmit = async () => {
     try {
@@ -56,63 +77,121 @@ const AuthModal = ({
       if (isLogin) {
         if (!email.trim()) {
           Alert.alert("Error", "Please enter your email");
+          setLoading(false);
           return;
         }
         if (!password) {
           Alert.alert("Error", "Please enter your password");
+          setLoading(false);
           return;
         }
         
-        const { error } = await supabase.auth.signInWithPassword({
-          email,
-          password,
-        });
-
-        if (error) {
-          Alert.alert("Error", error.message);
-          return;
+        try {
+          // Use AuthContext's signIn
+          const session = await signIn(email, password);
+          console.log("AuthModal - Login successful");
+          
+          // Call onLogin callback if provided
+          if (onLogin) {
+            try {
+              await onLogin(email, password);
+            } catch (error) {
+              console.error("Error in onLogin callback", error);
+            }
+          }
+          
+          // Reset form fields and close modal
+          setEmail("");
+          setPassword("");
+          onClose();
+          
+          // Verify session and navigate
+          const isValid = await refreshSession();
+          if (isValid) {
+            console.log("AuthModal - Session verified, navigating to library");
+            router.push('/library');
+          } else {
+            console.error("AuthModal - Session verification failed");
+            Alert.alert("Error", "Failed to verify session. Please try again.");
+          }
+        } catch (error: any) {
+          console.error("AuthModal - Login error:", error);
+          Alert.alert("Error", error.message || "Failed to sign in");
         }
-
-        if (onLogin) {
-          await onLogin(email, password);
-        }
-        onClose();
-        router.replace('/(tabs)');
       } else {
+        // Registration logic
         if (!username.trim()) {
           Alert.alert("Error", "Please enter a username");
+          setLoading(false);
           return;
         }
         if (!email.trim()) {
           Alert.alert("Error", "Please enter your email");
+          setLoading(false);
           return;
         }
         if (password.length < 6) {
           Alert.alert("Error", "Password must be at least 6 characters");
+          setLoading(false);
           return;
         }
         
-        // Simplify the signUp call to avoid TypeScript errors
-        const { error } = await supabase.auth.signUp({
-          email,
-          password,
-        });
+        try {
+          // Use AuthContext's signUp
+          const session = await signUp(email, password);
+          
+          if (session) {
+            // Create user profile
+            const { error: profileError } = await supabase
+              .from('users')
+              .insert({
+                id: session.user.id,
+                username,
+                avatar_url: `https://api.dicebear.com/7.x/avataaars/svg?seed=${username}`,
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString(),
+              });
 
-        if (error) {
-          Alert.alert("Error", error.message);
-          return;
-        }
+            if (profileError) {
+              console.error("Error creating user profile:", profileError);
+            }
 
-        // Note: Username will be handled through profile creation after signup
-        console.log("User signed up successfully with email:", email);
-        Alert.alert(
-          "Success",
-          "Registration successful! Please check your email to verify your account."
-        );
-        if (onRegister) {
-          onRegister(email, password, username);
+            Alert.alert(
+              "Success",
+              "Registration successful! You can now use the app."
+            );
+            
+            // Call onRegister callback if provided
+            if (onRegister) {
+              try {
+                onRegister(email, password, username);
+              } catch (error) {
+                console.error("Error in onRegister callback", error);
+              }
+            }
+            
+            // Reset form fields
+            setEmail("");
+            setPassword("");
+            setUsername("");
+            
+            // Close modal first
+            onClose();
+            
+            // Verify session and navigate
+            const isValid = await refreshSession();
+            if (isValid) {
+              console.log("AuthModal - Session verified after registration, navigating to library");
+              router.push('/library');
+            } else {
+              console.error("AuthModal - Session verification failed after registration");
+              Alert.alert("Error", "Failed to verify session. Please try signing in.");
+            }
+          }
+        } catch (error: any) {
+          console.error("AuthModal - Registration error:", error);
+          Alert.alert("Error", error.message || "Failed to create account");
         }
-        onClose();
       }
     } catch (error: unknown) {
       if (error instanceof Error) {
@@ -132,22 +211,46 @@ const AuthModal = ({
     setUsername("");
   };
 
+  // Custom close handler to prevent navigation
+  const handleClose = () => {
+    console.log("AuthModal - Closing modal, staying on path:", pathname);
+    
+    // Reset form fields
+    setEmail("");
+    setPassword("");
+    setUsername("");
+    
+    // Force a session refresh
+    refreshSession();
+    
+    // Close the modal
+    onClose();
+  };
+
   if (!visible) return null;
+
+  // If we're on a mobile device and inside a tab, render a fullscreen modal
+  const isInTab = pathname?.includes('/(tabs)');
 
   return (
     <Modal
       visible={visible}
-      transparent
+      transparent={!isInTab}
       animationType="slide"
-      onRequestClose={onClose}
+      onRequestClose={handleClose}
+      statusBarTranslucent={isInTab}
     >
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : "height"}
-        style={styles.container}
+        style={[styles.container, isInTab && styles.fullScreen]}
       >
-        <View style={[styles.overlay, { backgroundColor: 'rgba(0,0,0,0.5)' }]}>
+        <View style={[
+          styles.overlay, 
+          { backgroundColor: isInTab ? (isDarkMode ? '#0F172A' : '#FFFFFF') : 'rgba(0,0,0,0.5)' }
+        ]}>
           <View style={[
             styles.modalContent, 
+            isInTab && styles.fullScreenContent,
             { 
               backgroundColor: isDarkMode ? colors.card : '#FFFFFF',
               borderColor: colors.border
@@ -157,7 +260,7 @@ const AuthModal = ({
               <Text style={[styles.headerText, { color: colors.text }]}>
                 {isLogin ? "Sign In" : "Create Account"}
               </Text>
-              <TouchableOpacity onPress={onClose} style={styles.closeButton}>
+              <TouchableOpacity onPress={handleClose} style={styles.closeButton}>
                 <Feather name="x" size={24} color={colors.text} />
               </TouchableOpacity>
             </View>
@@ -378,6 +481,16 @@ const styles = StyleSheet.create({
   toggleModeText: {
     fontSize: 14,
     fontWeight: '500',
+  },
+  fullScreen: {
+    flex: 1,
+    width: '100%',
+    height: '100%',
+  },
+  fullScreenContent: {
+    width: '90%',
+    maxHeight: '80%',
+    borderRadius: 16,
   },
 });
 

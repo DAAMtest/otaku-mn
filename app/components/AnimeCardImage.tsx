@@ -6,6 +6,7 @@ import Badge from "./Badge";
 
 interface AnimeCardImageProps {
   imageUrl: string;
+  image_url: string;
   isFavorite?: boolean;
   isNew?: boolean;
   onFavoritePress?: () => void;
@@ -15,6 +16,7 @@ interface AnimeCardImageProps {
 
 const AnimeCardImage = ({
   imageUrl,
+  image_url,
   isFavorite = false,
   isNew = false,
   onFavoritePress,
@@ -39,9 +41,12 @@ const AnimeCardImage = ({
       activeOpacity={0.8}
     >
       <Image
-        source={{ uri: imageUrl }}
+        source={{ uri: imageUrl || image_url || "https://via.placeholder.com/100x150" }}
         style={[styles.image, { borderRadius: currentSize.borderRadius }]}
         resizeMode="cover"
+        onError={(e) => {
+          console.log('Image load error:', e.nativeEvent);
+        }}
       />
 
       {/* Favorite button */}

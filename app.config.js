@@ -14,12 +14,16 @@ module.exports = {
     assetBundlePatterns: ["**/*"],
     ios: {
       supportsTablet: true,
+      bundleIdentifier: "com.dembereltseren.animetempo",
+      newArchEnabled: true
     },
     android: {
       adaptiveIcon: {
         foregroundImage: "./assets/images/adaptive-icon.png",
         backgroundColor: "#111827",
       },
+      package: "com.dembereltseren.animetempo",
+      newArchEnabled: true
     },
     web: {
       favicon: "./assets/images/favicon.png",
@@ -50,5 +54,6 @@ module.exports = {
       config: "metro.config.js",
     },
     scheme: "animetempo",
+    newArchEnabled: true
   },
 };

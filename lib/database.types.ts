@@ -58,6 +58,56 @@ export interface Database {
           created_at?: string;
         };
       };
+      anime: {
+        Row: {
+          id: string;
+          title: string;
+          image_url: string;
+          rating: number | null;
+          description: string | null;
+          release_date: string | null;
+          cover_image_url: string | null;
+          release_year: number | null;
+          season: string | null;
+          status: string | null;
+          popularity: number | null;
+          created_at: string;
+          updated_at: string;
+          alternative_titles: string[];
+        };
+        Insert: {
+          id?: string;
+          title: string;
+          image_url: string;
+          rating?: number | null;
+          description?: string | null;
+          release_date?: string | null;
+          cover_image_url?: string | null;
+          release_year?: number | null;
+          season?: string | null;
+          status?: string | null;
+          popularity?: number | null;
+          created_at?: string;
+          updated_at?: string;
+          alternative_titles?: string[];
+        };
+        Update: {
+          id?: string;
+          title?: string;
+          image_url?: string;
+          rating?: number | null;
+          description?: string | null;
+          release_date?: string | null;
+          cover_image_url?: string | null;
+          release_year?: number | null;
+          season?: string | null;
+          status?: string | null;
+          popularity?: number | null;
+          created_at?: string;
+          updated_at?: string;
+          alternative_titles?: string[];
+        };
+      };
     };
     Views: {
       [_ in never]: never;

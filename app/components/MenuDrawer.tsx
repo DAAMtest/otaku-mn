@@ -40,6 +40,7 @@ interface MenuDrawerProps {
   isAuthenticated?: boolean;
   username?: string;
   avatarUrl?: string;
+  avatarurl?: string;
 }
 
 interface MenuItem {
@@ -63,7 +64,8 @@ const MenuDrawer = ({
   onMenuItemPress,
   isAuthenticated = false,
   username = "Guest",
-  avatarUrl = "https://api.dicebear.com/7.x/avataaars/svg?seed=guest",
+  avatarUrl,
+  avatarurl,
 }: MenuDrawerProps) => {
   const router = useRouter();
   const { colors, isDarkMode, toggleTheme } = useTheme();
@@ -341,9 +343,12 @@ const MenuDrawer = ({
             activeOpacity={0.8}
           >
             <Image
-              source={{ uri: avatarUrl }}
+              source={{ uri: avatarUrl || avatarurl || "https://api.dicebear.com/7.x/avataaars/svg?seed=guest" }}
               style={styles.avatar}
               accessibilityIgnoresInvertColors={true}
+              onError={(e) => {
+                console.log('Avatar load error:', e.nativeEvent);
+              }}
             />
             <View style={styles.profileInfo}>
               <Typography variant="h3" style={styles.username}>

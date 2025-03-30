@@ -31,6 +31,7 @@ import { useTheme } from "@/context/ThemeProvider";
 import { supabase } from "@/lib/supabase";
 import { useSupabaseAuth } from "@/hooks/useSupabaseAuth";
 import AuthModal from "@/auth/components/AuthModal";
+import { useAuth } from '@/context/AuthContext';
 
 // Define interfaces for type safety
 interface UserListItem {
@@ -39,86 +40,164 @@ interface UserListItem {
 
 interface UserProfileData {
   username: string;
-  avatar_url: string;
+  nickname: string;
+  avatarUrl: string;
   bio: string;
   created_at: string;
 }
 
+interface UserStats {
+  watchingCount: number;
+  favoriteCount: number;
+  watchlistCount: number;
+}
+
+interface UserAnimeListItem {
+  list_type: 'watching' | 'favorites' | 'watchlist';
+  user_id: string;
+}
+
+// Add debug function
+const debug = {
+  log: (...args: any[]) => {
+    if (__DEV__) {
+      console.log('[ProfileDebug]', ...args);
+    }
+  },
+  error: (...args: any[]) => {
+    if (__DEV__) {
+      console.error('[ProfileError]', ...args);
+    }
+  },
+  state: (prefix: string, obj: any) => {
+    if (__DEV__) {
+      console.log(`[ProfileDebug] ${prefix}:`, JSON.stringify(obj, null, 2));
+    }
+  }
+};
+
 export default function ProfileScreen() {
   const router = useRouter();
   const { colors, isDarkMode } = useTheme();
-  const { user, signOut } = useSupabaseAuth();
+  const { user, signOut, isLoading } = useAuth();
   
   const [listsLoading, setListsLoading] = useState(true);
   const [profileData, setProfileData] = useState({
     username: "",
+    nickname: "",
     avatarUrl: "",
     joinDate: "",
     bio: "",
   });
   
-  const [stats, setStats] = useState({
-    watchedCount: 0,
+  const [stats, setStats] = useState<UserStats>({
+    watchingCount: 0,
     favoriteCount: 0,
     watchlistCount: 0,
-    watchingCount: 0,
   });
   
   // Auth modal state
   const [authModalVisible, setAuthModalVisible] = useState(false);
   const [authModalMode, setAuthModalMode] = useState<'login' | 'register'>('login');
 
-  // Update profile data when user data changes
+  // Handle auth state
   useEffect(() => {
-    if (user) {
-      setProfileData({
-        username: user.username || user.email?.split('@')[0] || "User",
-        avatarUrl: user.avatarUrl || `https://api.dicebear.com/7.x/avataaars/svg?seed=user`,
-        joinDate: user.joinDate || "Recent member",
-        bio: user.bio || "No bio provided yet.",
-      });
-      
-      // Fetch user anime lists
-      if (user.id) {
-        fetchUserLists(user.id);
+    debug.state("Auth state changed", {
+      hasSession: !!user,
+      isLoading,
+      userId: user?.id
+    });
+
+    // Instead of redirecting, we'll show auth options
+    if (!isLoading && !user) {
+      debug.log("No session, showing auth options");
+      setAuthModalVisible(true);
+    }
+  }, [user, isLoading]);
+
+  useEffect(() => {
+    const fetchUserStats = async () => {
+      if (!user?.id) {
+        debug.log("No user ID, skipping stats fetch");
+        return;
       }
+      
+      try {
+        debug.log("Fetching stats for user:", user.id);
+        setListsLoading(true);
+        
+        const { data, error } = await supabase
+          .from('user_anime_lists')
+          .select('list_type')
+          .eq('user_id', user.id);
+
+        if (error) {
+          debug.error("Error fetching stats:", error);
+          throw error;
+        }
+
+        const counts = {
+          watchingCount: (data as UserAnimeListItem[]).filter(item => item.list_type === 'watching').length,
+          favoriteCount: (data as UserAnimeListItem[]).filter(item => item.list_type === 'favorites').length,
+          watchlistCount: (data as UserAnimeListItem[]).filter(item => item.list_type === 'watchlist').length
+        };
+
+        debug.state("User stats", counts);
+        setStats(counts);
+      } catch (error) {
+        debug.error("Error in fetchUserStats:", error);
+      } finally {
+        setListsLoading(false);
+      }
+    };
+
+    if (user?.id) {
+      fetchUserStats();
+    }
+  }, [user?.id]);
+
+  useEffect(() => {
+    const loadUserProfile = async () => {
+      if (!user?.id) return;
+
+      try {
+        const { data: profile, error } = await supabase
+          .from('users')
+          .select('username, nickname, avatar_url, bio, created_at')
+          .eq('id', user.id)
+          .single();
+
+        if (error) throw error;
+
+        if (profile) {
+          setProfileData({
+            username: profile.username || user.email?.split('@')[0] || 'User',
+            nickname: profile.nickname || profile.username || 'User',
+            avatarUrl: profile.avatar_url ? 
+              profile.avatar_url.replace('/svg?', '/png?') : 
+              `https://api.dicebear.com/7.x/avataaars/png?seed=${profile.username}`,
+            joinDate: new Date(profile.created_at).toLocaleDateString(),
+            bio: profile.bio || '',
+          });
+        }
+      } catch (error) {
+        console.error('Error loading profile:', error);
+        // Set default values if profile loading fails
+        setProfileData((prev) => ({
+          ...prev,
+          username: user.email?.split('@')[0] || 'User',
+          nickname: user.email?.split('@')[0] || 'User',
+          avatarUrl: `https://api.dicebear.com/7.x/avataaars/png?seed=${user.email}`,
+          joinDate: new Date().toLocaleDateString(),
+          bio: '',
+        }));
+      }
+    };
+
+    if (user) {
+      loadUserProfile();
     }
   }, [user]);
-  
-  // Fetch user anime lists
-  const fetchUserLists = async (userId: string) => {
-    try {
-      setListsLoading(true);
-      
-      const { data, error } = await supabase
-        .from("user_anime_lists")
-        .select("list_type")
-        .eq("user_id", userId);
-        
-      if (error) throw error;
-      
-      // Count items in each list
-      const counts = {
-        watchedCount: data.filter((item: UserListItem) => item.list_type === "completed").length,
-        favoriteCount: data.filter((item: UserListItem) => item.list_type === "favorites").length,
-        watchlistCount: data.filter((item: UserListItem) => item.list_type === "watchlist").length,
-        watchingCount: data.filter((item: UserListItem) => item.list_type === "watching").length,
-      };
-      
-      setStats(counts);
-    } catch (error) {
-      console.error("Error fetching user lists:", error);
-      // Set default values on error to avoid showing zeros
-      setStats({
-        watchedCount: 0,
-        favoriteCount: 0,
-        watchlistCount: 0,
-        watchingCount: 0,
-      });
-    } finally {
-      setListsLoading(false);
-    }
-  };
 
   // Handle back button press
   const handleBackPress = () => {
@@ -133,14 +212,13 @@ export default function ProfileScreen() {
         text: "Logout",
         onPress: async () => {
           try {
-            const { error } = await signOut();
-            if (error) throw error;
-            
-            Alert.alert("Logged Out", "You have been logged out successfully");
-            router.replace("/(tabs)");
+            debug.log("Signing out...");
+            await signOut();
+            debug.log("Sign out successful");
+            setAuthModalVisible(true); // Show auth modal after logout
           } catch (error) {
-            console.error("Error signing out:", error);
-            Alert.alert("Error", "Failed to sign out");
+            debug.error("Error signing out:", error);
+            Alert.alert("Error", "Failed to sign out. Please try again.");
           }
         },
         style: "destructive",
@@ -192,8 +270,8 @@ export default function ProfileScreen() {
   };
   
   const handleLoginSuccess = async () => {
-    // Refresh the page after successful login
-    console.log("Login successful");
+    debug.log("Login successful, hiding auth modal");
+    setAuthModalVisible(false);
   };
 
   // Show a minimal loading state that doesn't block the whole screen
@@ -455,6 +533,42 @@ export default function ProfileScreen() {
     );
   };
 
+  // Add detailed logging for session state and navigation
+  useEffect(() => {
+    debug.state("Checking session state on profile load", {
+      userExists: !!user,
+      userId: user?.id
+    });
+
+    if (!user) {
+      debug.log("No user found, setting authModalVisible to true");
+      setAuthModalVisible(true);
+    } else {
+      debug.log("User found, setting authModalVisible to false");
+      setAuthModalVisible(false);
+    }
+  }, [user]);
+
+  // Log auth modal visibility
+  useEffect(() => {
+    debug.state("AuthModal visibility changed", {
+      authModalVisible,
+      authModalMode
+    });
+  }, [authModalVisible, authModalMode]);
+
+  // Log user state
+  useEffect(() => {
+    debug.state("User state changed", {
+      userExists: !!user,
+      userId: user?.id
+    });
+
+    if (!user) {
+      debug.log("No user, rendering auth options");
+    }
+  }, [user]);
+
   if (!user) {
     return renderAuthOptions();
   }
@@ -509,6 +623,14 @@ export default function ProfileScreen() {
                 source={{ uri: profileData.avatarUrl }}
                 style={{ width: 80, height: 80, borderRadius: 40 }}
                 resizeMode="cover"
+                onError={(e) => {
+                  console.error("Error loading avatar:", e.nativeEvent.error);
+                  // Use a more reliable fallback with PNG format
+                  setProfileData((prev) => ({
+                    ...prev,
+                    avatarUrl: `https://api.dicebear.com/7.x/avataaars/png?seed=${Math.random().toString(36).substring(7)}`,
+                  }));
+                }}
               />
               <View style={{ marginLeft: 16, flex: 1 }}>
                 <Text
@@ -518,7 +640,16 @@ export default function ProfileScreen() {
                     fontWeight: "bold",
                   }}
                 >
-                  {profileData.username}
+                  {profileData.nickname || profileData.username}
+                </Text>
+                <Text
+                  style={{
+                    color: colors.textSecondary,
+                    fontSize: 14,
+                    marginTop: 2,
+                  }}
+                >
+                  @{profileData.username}
                 </Text>
                 <Text style={{ color: colors.textSecondary, fontSize: 14 }}>
                   Member since {profileData.joinDate}
@@ -566,10 +697,10 @@ export default function ProfileScreen() {
                     fontWeight: "bold",
                   }}
                 >
-                  {listsLoading ? "-" : stats.watchedCount}
+                  {listsLoading ? "-" : stats.watchingCount}
                 </Text>
                 <Text style={{ color: colors.textSecondary, fontSize: 12 }}>
-                  Watched
+                  Watching
                 </Text>
               </View>
               <View style={{ alignItems: "center" }}>
@@ -631,7 +762,6 @@ export default function ProfileScreen() {
               <Text style={{ color: colors.text, marginLeft: 12, flex: 1 }}>
                 Currently Watching
               </Text>
-              <Text style={{ color: colors.textSecondary }}>{listsLoading ? "-" : stats.watchingCount}</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -648,9 +778,6 @@ export default function ProfileScreen() {
               <Award size={20} color={colors.success} />
               <Text style={{ color: colors.text, marginLeft: 12, flex: 1 }}>
                 Completed
-              </Text>
-              <Text style={{ color: colors.textSecondary }}>
-                {listsLoading ? "-" : stats.watchedCount}
               </Text>
             </TouchableOpacity>
 
@@ -669,9 +796,6 @@ export default function ProfileScreen() {
               <Text style={{ color: colors.text, marginLeft: 12, flex: 1 }}>
                 Watchlist
               </Text>
-              <Text style={{ color: colors.textSecondary }}>
-                {listsLoading ? "-" : stats.watchlistCount}
-              </Text>
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -689,9 +813,6 @@ export default function ProfileScreen() {
               <Text style={{ color: colors.text, marginLeft: 12, flex: 1 }}>
                 Favorites
               </Text>
-              <Text style={{ color: colors.textSecondary }}>
-                {listsLoading ? "-" : stats.favoriteCount}
-              </Text>
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -708,7 +829,6 @@ export default function ProfileScreen() {
               <Text style={{ color: colors.text, marginLeft: 12, flex: 1 }}>
                 Watch History
               </Text>
-              <Text style={{ color: colors.textSecondary }}>View</Text>
             </TouchableOpacity>
           </View>
 

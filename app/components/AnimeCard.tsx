@@ -17,7 +17,8 @@ import { Anime } from "@/hooks/useAnimeSearch";
 interface AnimeCardProps {
   id: string;
   title: string;
-  imageUrl: string;
+  imageUrl?: string;
+  image_url?: string;
   rating: number;
   isFavorite: boolean;
   onPress: () => void;
@@ -38,6 +39,7 @@ const AnimeCard = ({
   id,
   title,
   imageUrl,
+  image_url,
   rating,
   isFavorite,
   onPress,
@@ -175,7 +177,7 @@ const AnimeCard = ({
       >
         <View style={styles.imageContainer}>
           <Image
-            source={{ uri: imageUrl }}
+            source={{ uri: imageUrl || image_url }}
             style={[
               styles.image,
               { backgroundColor: colors.background },

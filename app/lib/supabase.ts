@@ -1,22 +1,51 @@
 import 'react-native-url-polyfill/auto';
-import { createClient } from '@supabase/supabase-js';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as SecureStore from 'expo-secure-store';
+import { createClient } from '@supabase/supabase-js';
 
 /**
  * Supabase client configuration with AsyncStorage for session persistence.
  * Uses environment variables for configuration.
  */
 
-// Access environment variables
-const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
-const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
+// Secure storage implementation with size check
+const ExpoSecureStoreAdapter = {
+  getItem: (key: string) => {
+    return SecureStore.getItemAsync(key);
+  },
+  setItem: async (key: string, value: string) => {
+    // Check if value size is less than 2KB (2048 bytes)
+    const encoder = new TextEncoder();
+    const dataSize = encoder.encode(value).length;
+    
+    if (dataSize > 2048) {
+      // For large values, fall back to AsyncStorage
+      await AsyncStorage.setItem(key, value);
+    } else {
+      await SecureStore.setItemAsync(key, value);
+    }
+  },
+  removeItem: (key: string) => {
+    return SecureStore.deleteItemAsync(key);
+  },
+};
+
+const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL || '';
+const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || '';
 
 if (!supabaseUrl || !supabaseAnonKey) {
-  throw new Error('Missing Supabase configuration. Please check your .env file');
+  throw new Error('Missing Supabase environment variables');
 }
 
-// Create a single supabase client for interacting with your database
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+// Create Supabase client
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+  auth: {
+    storage: ExpoSecureStoreAdapter,
+    autoRefreshToken: true,
+    persistSession: true,
+    detectSessionInUrl: false,
+  },
+});
 
 // Fetch anime data from Supabase
 export const fetchAnime = async () => {

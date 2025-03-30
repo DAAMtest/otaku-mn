@@ -34,6 +34,14 @@ export function useAnimeData() {
   });
   const [error, setError] = useState<Error | null>(null);
 
+  // Fetch data when the hook mounts
+  useEffect(() => {
+    fetchGenres();
+    fetchTrendingAnime();
+    fetchNewReleases();
+    fetchFeaturedAnime();
+  }, []);
+
   // Fetch all available genres
   const fetchGenres = async () => {
     try {

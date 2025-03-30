@@ -1,5 +1,5 @@
 import React, { useEffect } from "react";
-import { View, StatusBar, Platform, ActivityIndicator, StyleSheet } from "react-native";
+import { View, StatusBar, Platform, ActivityIndicator, StyleSheet, Text } from "react-native";
 import { Slot, usePathname, useSegments } from "expo-router";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { ThemeProvider, useTheme } from "@/context/ThemeProvider";
@@ -43,7 +43,7 @@ function RootLayoutContent() {
   const segments = useSegments();
   
   // Apply middleware for route protection
-  const isCheckingAuth = useProtectedRoute(segments);
+  const isLoading = useProtectedRoute(segments);
 
   // Set status bar style based on theme
   useEffect(() => {
@@ -51,16 +51,24 @@ function RootLayoutContent() {
   }, [colors.statusBar]);
 
   // Show loading indicator while checking authentication
-  if (isCheckingAuth) {
+  if (isLoading) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.background }}>
-        <ActivityIndicator size="large" color={colors.primary} />
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={colors.primary} />
+          <Text style={[styles.loadingText, { color: colors.text }]}>
+            Loading...
+          </Text>
+        </View>
       </View>
     );
   }
 
   // Check if we should show bottom navigation
-  const showBottomNavigation = !pathname.startsWith('/anime/') && !pathname.startsWith('/auth/');
+  const showBottomNavigation = !pathname.startsWith('/auth/') && 
+    !pathname.startsWith('/anime/') && 
+    !pathname.startsWith('/admin/') &&
+    pathname !== '/';  // Hide on root path which is handled by home screen
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
@@ -80,9 +88,20 @@ const styles = StyleSheet.create({
   },
   contentWithBottomNav: {
     flex: 1,
-    paddingBottom: Platform.OS === 'ios' ? 90 : 70, // Adjusted padding for different platforms
+    paddingBottom: Platform.OS === 'ios' ? 90 : 70,
   },
   contentWithoutBottomNav: {
     flex: 1,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
+    fontWeight: '500',
   },
 });

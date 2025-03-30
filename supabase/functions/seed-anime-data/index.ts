@@ -150,7 +150,7 @@ serve(async (req: Request) => {
             .from("anime")
             .insert({
               title: anime.title,
-              image_url: anime.image_url,
+              imageurl: anime.image_url,
               rating: anime.rating,
               description: anime.description,
               release_date: anime.release_date,

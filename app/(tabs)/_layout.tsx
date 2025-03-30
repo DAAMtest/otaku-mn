@@ -1,7 +1,22 @@
 import { Tabs } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
+import { useAuth } from '@/context/AuthContext';
+import { useEffect } from 'react';
+import { usePathname } from 'expo-router';
 
 export default function TabsLayout() {
+  const { session, isLoading } = useAuth();
+  const pathname = usePathname();
+  
+  // Debug logging for tab navigation
+  useEffect(() => {
+    console.log('Tabs layout - Auth state:', { 
+      sessionExists: !!session, 
+      isLoading,
+      currentPath: pathname
+    });
+  }, [session, isLoading, pathname]);
+  
   return (
     <Tabs
       screenOptions={{

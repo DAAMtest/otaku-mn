@@ -2,6 +2,24 @@ import { useState, useEffect } from "react";
 import { supabase } from "../lib/supabase";
 import type { Database } from "@lib/database.types";
 import { UUID } from "./useAnimeSearch";
+import { SupabaseClient } from "@supabase/supabase-js";
+
+type NotificationRow = {
+  id: string;
+  user_id: string;
+  title: string;
+  message: string;
+  is_read: boolean;
+  created_at: string;
+  updated_at: string;
+  type: string;
+  related_id: string | null;
+};
+
+type RealtimePostgresChangesPayload<T> = {
+  old: T;
+  new: T;
+};
 
 export interface Notification {
   id: UUID;
@@ -9,7 +27,7 @@ export interface Notification {
   message: string;
   type: string;
   isRead: boolean;
-  relatedId?: UUID;
+  relatedId: string | null;
   createdAt: string;
 }
 
@@ -35,7 +53,7 @@ export function useNotifications(userId: string | null) {
 
       if (fetchError) throw fetchError;
 
-      const formattedData = (data || []).map((item) => ({
+      const formattedData = (data || []).map((item: NotificationRow) => ({
         id: item.id,
         title: item.title,
         message: item.message,
@@ -46,7 +64,7 @@ export function useNotifications(userId: string | null) {
       }));
 
       setNotifications(formattedData);
-      setUnreadCount(formattedData.filter((n) => !n.isRead).length);
+      setUnreadCount(formattedData.filter((n: Notification) => !n.isRead).length);
     } catch (err) {
       console.error("Error fetching notifications:", err);
       setError(err as Error);
@@ -143,7 +161,7 @@ export function useNotifications(userId: string | null) {
     fetchNotifications();
 
     // Set up subscription
-    const subscription = supabase
+    const subscription = (supabase as any)
       .channel("public:notifications")
       .on(
         "postgres_changes",
@@ -153,9 +171,9 @@ export function useNotifications(userId: string | null) {
           table: "notifications",
           filter: `user_id=eq.${userId}`,
         },
-        (payload) => {
+        (payload: RealtimePostgresChangesPayload<NotificationRow>) => {
           // Add new notification to state
-          const newNotification = {
+          const newNotification: Notification = {
             id: payload.new.id,
             title: payload.new.title,
             message: payload.new.message,
@@ -179,31 +197,26 @@ export function useNotifications(userId: string | null) {
           table: "notifications",
           filter: `user_id=eq.${userId}`,
         },
-        (payload) => {
+        (payload: RealtimePostgresChangesPayload<NotificationRow>) => {
           // Update notification in state
+          const updatedNotification: Notification = {
+            id: payload.new.id,
+            title: payload.new.title,
+            message: payload.new.message,
+            type: payload.new.type,
+            isRead: payload.new.is_read,
+            relatedId: payload.new.related_id,
+            createdAt: payload.new.created_at,
+          };
+
           setNotifications((prev) =>
-            prev.map((n) =>
-              n.id === payload.new.id
-                ? {
-                    ...n,
-                    title: payload.new.title,
-                    message: payload.new.message,
-                    type: payload.new.type,
-                    isRead: payload.new.is_read,
-                    relatedId: payload.new.related_id,
-                    createdAt: payload.new.created_at,
-                  }
-                : n,
-            ),
+            prev.map((n) => (n.id === payload.new.id ? updatedNotification : n)),
           );
 
-          // Recalculate unread count
-          setUnreadCount((prev) => {
-            const unreadNotifications = notifications.filter(
-              (n) => !n.isRead,
-            ).length;
-            return unreadNotifications;
-          });
+          // Recalculate unread count using the updated notification
+          if (payload.old.is_read !== payload.new.is_read) {
+            setUnreadCount((prev) => prev + (payload.new.is_read ? -1 : 1));
+          }
         },
       )
       .on(
@@ -214,7 +227,7 @@ export function useNotifications(userId: string | null) {
           table: "notifications",
           filter: `user_id=eq.${userId}`,
         },
-        (payload) => {
+        (payload: RealtimePostgresChangesPayload<NotificationRow>) => {
           // Remove notification from state
           const deletedNotification = notifications.find(
             (n) => n.id === payload.old.id,
@@ -231,7 +244,7 @@ export function useNotifications(userId: string | null) {
       .subscribe();
 
     return () => {
-      supabase.removeChannel(subscription);
+      void (subscription as any).unsubscribe();
     };
   }, [userId]);
 
