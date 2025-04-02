@@ -8,6 +8,7 @@ import {
   Text,
   StyleSheet,
   ActivityIndicator,
+  ScrollView,
 } from "react-native";
 import { useRouter, usePathname } from "expo-router";
 import Header from "@/components/Header";
@@ -15,6 +16,8 @@ import FilterBar from "@/components/FilterBar";
 import AnimeGrid from "@/components/AnimeGrid";
 import AuthModal from "@/auth/components/AuthModal";
 import MenuDrawer from "@/components/MenuDrawer";
+import TrendingAnime from "@/components/TrendingAnime";
+import NewReleasesAnime from "@/components/NewReleasesAnime";
 import { useAuth } from "@/context/AuthContext";
 import type { Database } from "@/lib/database.types";
 import useAnimeData from "@/hooks/useAnimeData";
@@ -60,11 +63,14 @@ const HomeScreen = () => {
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [showMenuDrawer, setShowMenuDrawer] = useState(false);
   const [selectedGenres, setSelectedGenres] = useState<string[]>([]);
-  const [currentSortOrder, setCurrentSortOrder] = useState<"asc" | "desc">("desc");
+  const [currentSortOrder, setCurrentSortOrder] = useState<"asc" | "desc">(
+    "desc",
+  );
   const [animeList, setAnimeList] = useState<Anime[]>([]);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [topAnime, setTopAnime] = useState<Anime[]>([]);
+  const [activeTab, setActiveTab] = useState("home");
 
   // Get anime data from the hook
   const {
@@ -80,9 +86,11 @@ const HomeScreen = () => {
 
   // Format anime data
   const formatAnimeData = useCallback((data: any[]) => {
-    return data.map(item => {
+    return data.map((item) => {
       const genres = item.anime_genres
-        ? item.anime_genres.map((ag: { genres: { name: string } }) => ag.genres.name)
+        ? item.anime_genres.map(
+            (ag: { genres: { name: string } }) => ag.genres.name,
+          )
         : [];
 
       return {
@@ -104,16 +112,17 @@ const HomeScreen = () => {
   }, []);
 
   // Load anime data
-  const loadAnime = useCallback(async (shouldRefresh = false) => {
-    if (isLoading && !shouldRefresh) return;
-    
-    try {
-      setIsLoading(true);
-      if (shouldRefresh) {
-        setIsRefreshing(true);
-      }
+  const loadAnime = useCallback(
+    async (shouldRefresh = false) => {
+      if (isLoading && !shouldRefresh) return;
 
-      let query = supabase.from("anime").select(`
+      try {
+        setIsLoading(true);
+        if (shouldRefresh) {
+          setIsRefreshing(true);
+        }
+
+        let query = supabase.from("anime").select(`
         id,
         title,
         image_url,
@@ -132,27 +141,30 @@ const HomeScreen = () => {
         )
       `);
 
-      if (selectedGenres.length > 0) {
-        query = query.in('anime_genres.genres.name', selectedGenres);
+        if (selectedGenres.length > 0) {
+          query = query.in("anime_genres.genres.name", selectedGenres);
+        }
+
+        query = query
+          .order("popularity", { ascending: currentSortOrder === "asc" })
+          .order("title", { ascending: true });
+
+        const { data, error } = await query;
+
+        if (error) throw error;
+
+        const formattedData = formatAnimeData(data || []);
+        setAnimeList(formattedData);
+      } catch (error) {
+        console.error("Error loading anime:", error);
+        Alert.alert("Error", "Failed to load anime list");
+      } finally {
+        setIsLoading(false);
+        setIsRefreshing(false);
       }
-
-      query = query.order("popularity", { ascending: currentSortOrder === "asc" })
-        .order("title", { ascending: true });
-
-      const { data, error } = await query;
-
-      if (error) throw error;
-
-      const formattedData = formatAnimeData(data || []);
-      setAnimeList(formattedData);
-    } catch (error) {
-      console.error("Error loading anime:", error);
-      Alert.alert("Error", "Failed to load anime list");
-    } finally {
-      setIsLoading(false);
-      setIsRefreshing(false);
-    }
-  }, [selectedGenres, currentSortOrder, formatAnimeData]);
+    },
+    [selectedGenres, currentSortOrder, formatAnimeData],
+  );
 
   // Initial data load
   useEffect(() => {
@@ -163,16 +175,19 @@ const HomeScreen = () => {
   }, [authLoading]); // Only run when auth loading changes
 
   // Handle filter changes
-  const handleFilterPress = useCallback((option: FilterOption) => {
-    if (isLoading) return; // Prevent multiple clicks while loading
-    const genreId = option.id;
-    setSelectedGenres(prev => {
-      const newGenres = prev.includes(genreId)
-        ? prev.filter(id => id !== genreId)
-        : [...prev, genreId];
-      return newGenres;
-    });
-  }, [isLoading]);
+  const handleFilterPress = useCallback(
+    (option: FilterOption) => {
+      if (isLoading) return; // Prevent multiple clicks while loading
+      const genreId = option.id;
+      setSelectedGenres((prev) => {
+        const newGenres = prev.includes(genreId)
+          ? prev.filter((id) => id !== genreId)
+          : [...prev, genreId];
+        return newGenres;
+      });
+    },
+    [isLoading],
+  );
 
   // Watch for filter changes and load data with debounce
   useEffect(() => {
@@ -186,10 +201,13 @@ const HomeScreen = () => {
   }, [selectedGenres, currentSortOrder]); // Remove loadAnime and authLoading from dependencies
 
   // Handle sort order change
-  const handleSortOrderChange = useCallback((order: "asc" | "desc") => {
-    if (isLoading) return; // Prevent multiple clicks while loading
-    setCurrentSortOrder(order);
-  }, [isLoading]);
+  const handleSortOrderChange = useCallback(
+    (order: "asc" | "desc") => {
+      if (isLoading) return; // Prevent multiple clicks while loading
+      setCurrentSortOrder(order);
+    },
+    [isLoading],
+  );
 
   // Memoized values
   const filterOptions = useMemo(() => {
@@ -212,9 +230,12 @@ const HomeScreen = () => {
   useEffect(() => {
     const checkStoredSession = async () => {
       try {
-        const storedSession = await SecureStore.getItemAsync("supabase-session");
+        const storedSession =
+          await SecureStore.getItemAsync("supabase-session");
         if (storedSession) {
-          const { data: { session: currentSession } } = await supabase.auth.getSession();
+          const {
+            data: { session: currentSession },
+          } = await supabase.auth.getSession();
           if (!currentSession) {
             await SecureStore.deleteItemAsync("supabase-session");
           }
@@ -336,7 +357,11 @@ const HomeScreen = () => {
   };
 
   // Handle register
-  const handleRegister = async (email: string, password: string, username: string) => {
+  const handleRegister = async (
+    email: string,
+    password: string,
+    username: string,
+  ) => {
     try {
       const { error: signUpError, data } = await supabase.auth.signUp({
         email,
@@ -347,15 +372,13 @@ const HomeScreen = () => {
 
       if (data.user) {
         // Create user profile
-        const { error: profileError } = await supabase
-          .from('users')
-          .insert({
-            id: data.user.id,
-            username,
-            avatar_url: `https://api.dicebear.com/7.x/avataaars/svg?seed=${username}`,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          });
+        const { error: profileError } = await supabase.from("users").insert({
+          id: data.user.id,
+          username,
+          avatar_url: `https://api.dicebear.com/7.x/avataaars/svg?seed=${username}`,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        });
 
         if (profileError) {
           console.error("Error creating user profile:", profileError);
@@ -370,7 +393,7 @@ const HomeScreen = () => {
         "Registration Failed",
         error instanceof Error
           ? error.message
-          : "An error occurred during registration"
+          : "An error occurred during registration",
       );
     }
   };
@@ -463,15 +486,38 @@ const HomeScreen = () => {
         isLoading={Object.values(animeDataLoading).some((loading) => loading)}
       />
 
-      <AnimeGrid
-        animeList={animeList}
-        onAnimePress={handleAnimePress}
-        onAddToList={(anime) => handleAddToList(anime, "watchlist")}
-        onFavorite={handleFavorite}
-        refreshing={isRefreshing}
-        onRefresh={() => loadAnime(true)}
-        numColumns={2}
-      />
+      <ScrollView style={styles.scrollView}>
+        {/* Featured Section */}
+        <View style={styles.section}>
+          <AnimeGrid
+            animeList={animeList}
+            onAnimePress={handleAnimePress}
+            onAddToList={(anime) => handleAddToList(anime, "watchlist")}
+            onFavorite={handleFavorite}
+            refreshing={isRefreshing}
+            onRefresh={() => loadAnime(true)}
+            numColumns={2}
+          />
+        </View>
+
+        {/* Trending Anime Section */}
+        <View style={styles.section}>
+          <TrendingAnime
+            numColumns={2}
+            maxItems={6}
+            onViewAllPress={() => router.push("/trending")}
+          />
+        </View>
+
+        {/* New Releases Section */}
+        <View style={styles.section}>
+          <NewReleasesAnime
+            numColumns={2}
+            maxItems={6}
+            onViewAllPress={() => router.push("/new-releases")}
+          />
+        </View>
+      </ScrollView>
 
       <AuthModal
         visible={showAuthModal}
@@ -485,14 +531,30 @@ const HomeScreen = () => {
         visible={showMenuDrawer}
         onClose={() => setShowMenuDrawer(false)}
         isAuthenticated={!!user}
-        username={user?.email?.split('@')[0] || 'Guest'}
+        username={user?.email?.split("@")[0] || "Guest"}
         onMenuItemPress={handleMenuItemPress}
       />
 
       <BottomNavigation
         currentRoute="/"
-        activeTab="home"
-        onTabChange={() => {}}
+        activeTab={activeTab}
+        onTabChange={(tab) => {
+          setActiveTab(tab);
+          switch (tab) {
+            case "history":
+              router.push("/history");
+              break;
+            case "lists":
+              router.push("/lists");
+              break;
+            case "downloads":
+              router.push("/downloads");
+              break;
+            case "profile":
+              router.push("/profile");
+              break;
+          }
+        }}
       />
     </SafeAreaView>
   );
@@ -505,8 +567,14 @@ const styles = StyleSheet.create({
   },
   loadingContainer: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  scrollView: {
+    flex: 1,
+  },
+  section: {
+    marginBottom: 16,
   },
 });
 

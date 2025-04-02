@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useEffect } from "react";
 import {
   View,
   Text,
@@ -25,43 +25,32 @@ import {
   Trash2,
   FileJson,
 } from "lucide-react-native";
-import { supabase } from "@/lib/supabase";
-import { useAuth } from "@/context/AuthContext";
-import useUserPreferences from "@/hooks/useUserPreferences";
-
-interface AppSettings {
-  maintenance_mode: boolean;
-  allow_new_registrations: boolean;
-  default_user_role: string;
-  notification_frequency: string;
-  cache_duration: number;
-  api_rate_limit: number;
-  content_moderation: boolean;
-  auto_backup: boolean;
-  theme_color: string;
-  app_version: string;
-}
+import { useAuthStore } from "@/src/store/authStore";
+import {
+  useAdminSettingsStore,
+  AppSettings,
+} from "@/src/store/adminSettingsStore";
+import { useUserPreferencesStore } from "@/store/userPreferencesStore";
 
 export default function AdminSettings() {
   const router = useRouter();
-  const { user, session } = useAuth();
-  const { preferences, updatePreferences } = useUserPreferences(
-    user?.id || null,
-  );
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [settings, setSettings] = useState<AppSettings>({
-    maintenance_mode: false,
-    allow_new_registrations: true,
-    default_user_role: "user",
-    notification_frequency: "daily",
-    cache_duration: 60,
-    api_rate_limit: 100,
-    content_moderation: true,
-    auto_backup: true,
-    theme_color: "#8B5CF6",
-    app_version: "1.0.0",
-  });
+  const { user, session } = useAuthStore();
+  const { preferences, updatePreferences } = useUserPreferencesStore();
+  const {
+    settings,
+    loading,
+    saving,
+    error,
+    loadSettings,
+    saveSettings,
+    resetSettings,
+    exportSettings,
+    importSettings,
+    backupDatabase,
+    clearCache,
+    setSettings,
+    setSaving,
+  } = useAdminSettingsStore();
 
   // Check authentication and fetch settings on component mount
   useEffect(() => {
@@ -69,11 +58,7 @@ export default function AdminSettings() {
       router.replace("/");
       return;
     }
-    // In a real app, you would fetch settings from the database
-    // For this demo, we'll just simulate loading
-    setTimeout(() => {
-      setLoading(false);
-    }, 1000);
+    loadSettings();
   }, [session, router]);
 
   // Handle back button press
@@ -83,18 +68,14 @@ export default function AdminSettings() {
 
   // Handle save settings
   const handleSaveSettings = async () => {
-    setSaving(true);
-    try {
-      // In a real app, you would save settings to the database
-      // For this demo, we'll just simulate saving
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-      Alert.alert("Success", "Settings saved successfully");
-    } catch (error) {
-      console.error("Error saving settings:", error);
-      Alert.alert("Error", "Failed to save settings");
-    } finally {
-      setSaving(false);
+    const { error } = await saveSettings(settings);
+
+    if (error) {
+      Alert.alert("Error", `Failed to save settings: ${error.message}`);
+      return;
     }
+
+    Alert.alert("Success", "Settings saved successfully");
   };
 
   // Handle reset settings
@@ -107,18 +88,7 @@ export default function AdminSettings() {
         {
           text: "Reset",
           onPress: () => {
-            setSettings({
-              maintenance_mode: false,
-              allow_new_registrations: true,
-              default_user_role: "user",
-              notification_frequency: "daily",
-              cache_duration: 60,
-              api_rate_limit: 100,
-              content_moderation: true,
-              auto_backup: true,
-              theme_color: "#8B5CF6",
-              app_version: "1.0.0",
-            });
+            resetSettings();
             Alert.alert("Success", "Settings reset to default values");
           },
           style: "destructive",
@@ -129,6 +99,7 @@ export default function AdminSettings() {
 
   // Handle export settings
   const handleExportSettings = () => {
+    exportSettings();
     Alert.alert(
       "Export Settings",
       "Settings would be exported as JSON in a real app.",
@@ -138,6 +109,7 @@ export default function AdminSettings() {
 
   // Handle import settings
   const handleImportSettings = () => {
+    importSettings();
     Alert.alert(
       "Import Settings",
       "Settings would be imported from JSON in a real app.",
@@ -147,6 +119,7 @@ export default function AdminSettings() {
 
   // Handle database backup
   const handleDatabaseBackup = () => {
+    backupDatabase();
     Alert.alert(
       "Database Backup",
       "This would trigger a database backup in a real app.",
@@ -156,6 +129,7 @@ export default function AdminSettings() {
 
   // Handle clear cache
   const handleClearCache = () => {
+    clearCache();
     Alert.alert(
       "Clear Cache",
       "This would clear the application cache in a real app.",

@@ -24,26 +24,23 @@ import {
   Trash2,
   UserCog,
 } from "lucide-react-native";
-import { supabase } from "@/lib/supabase";
-import { useAuth } from "@/context/AuthContext";
-
-interface UserProfile {
-  id: string;
-  username: string;
-  email?: string;
-  avatar_url?: string;
-  created_at: string;
-  is_admin?: boolean;
-  status?: string;
-}
+import { useAuthStore } from "@/src/store/authStore";
+import { useAdminUserStore, UserProfile } from "@/src/store/adminUserStore";
 
 export default function UserManagement() {
   const router = useRouter();
-  const { user, session } = useAuth();
-  const [userList, setUserList] = useState<UserProfile[]>([]);
+  const { user, session } = useAuthStore();
+  const {
+    userList,
+    loading,
+    error,
+    fetchUserList,
+    updateUserRole,
+    updateUserStatus,
+    deleteUser,
+  } = useAdminUserStore();
   const [filteredUserList, setFilteredUserList] = useState<UserProfile[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
-  const [loading, setLoading] = useState(true);
 
   // Check authentication and fetch user list on component mount
   useEffect(() => {
@@ -69,50 +66,24 @@ export default function UserManagement() {
     }
   }, [searchQuery, userList]);
 
-  // Fetch user list from Supabase
-  const fetchUserList = async () => {
-    setLoading(true);
-    try {
-      // In a real app, you would fetch from auth.users and join with public.users
-      // For this demo, we'll just fetch from public.users
-      const { data, error } = await supabase
-        .from("users")
-        .select("*")
-        .order("username");
-
-      if (error) throw error;
-
-      // Add mock admin status and email for demo purposes
-      const enhancedData = data.map((user: UserProfile) => ({
-        ...user,
-        email: user.email || `${user.username.toLowerCase()}@example.com`,
-        is_admin: user.username === "admin",
-        status: "active",
-      }));
-
-      setUserList(enhancedData);
-      setFilteredUserList(enhancedData);
-    } catch (error) {
-      console.error("Error fetching users:", error);
-      Alert.alert("Error", "Failed to fetch user list");
-    } finally {
-      setLoading(false);
-    }
-  };
-
   // Handle back button press
   const handleBackPress = () => {
     router.back();
   };
 
   // Handle user role toggle
-  const handleRoleToggle = (userId: string) => {
-    // In a real app, this would update the user's role in the database
-    setUserList((prevList) =>
-      prevList.map((user) =>
-        user.id === userId ? { ...user, is_admin: !user.is_admin } : user,
-      ),
-    );
+  const handleRoleToggle = async (userId: string) => {
+    // Find the current user and toggle their admin status
+    const currentUser = userList.find((u) => u.id === userId);
+    if (!currentUser) return;
+
+    const { error } = await updateUserRole(userId, !currentUser.is_admin);
+
+    if (error) {
+      Alert.alert("Error", `Failed to update user role: ${error.message}`);
+      return;
+    }
+
     Alert.alert(
       "Role Updated",
       "User role has been updated. In a real app, this would update the database.",
@@ -120,14 +91,16 @@ export default function UserManagement() {
   };
 
   // Handle user status toggle
-  const handleStatusToggle = (userId: string, currentStatus: string) => {
+  const handleStatusToggle = async (userId: string, currentStatus: string) => {
     const newStatus = currentStatus === "active" ? "suspended" : "active";
-    // In a real app, this would update the user's status in the database
-    setUserList((prevList) =>
-      prevList.map((user) =>
-        user.id === userId ? { ...user, status: newStatus } : user,
-      ),
-    );
+
+    const { error } = await updateUserStatus(userId, newStatus);
+
+    if (error) {
+      Alert.alert("Error", `Failed to update user status: ${error.message}`);
+      return;
+    }
+
     Alert.alert(
       "Status Updated",
       `User has been ${newStatus}. In a real app, this would update the database.`,
@@ -144,22 +117,14 @@ export default function UserManagement() {
         {
           text: "Delete",
           onPress: async () => {
-            try {
-              // In a real app, you would delete from auth.users and cascade to public.users
-              const { error } = await supabase
-                .from("users")
-                .delete()
-                .eq("id", userId);
+            const { error } = await deleteUser(userId);
 
-              if (error) throw error;
-
-              // Update the local state
-              setUserList(userList.filter((user) => user.id !== userId));
-              Alert.alert("Success", "User deleted successfully");
-            } catch (error) {
-              console.error("Error deleting user:", error);
-              Alert.alert("Error", "Failed to delete user");
+            if (error) {
+              Alert.alert("Error", `Failed to delete user: ${error.message}`);
+              return;
             }
+
+            Alert.alert("Success", "User deleted successfully");
           },
           style: "destructive",
         },
