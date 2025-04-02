@@ -4,864 +4,449 @@ import {
   Text,
   SafeAreaView,
   StatusBar,
-  Image,
   TouchableOpacity,
-  ScrollView,
-  Alert,
-  ActivityIndicator,
   StyleSheet,
+  Image,
+  Alert,
+  ScrollView,
 } from "react-native";
 import { useRouter } from "expo-router";
-import {
-  ArrowLeft,
-  Settings,
-  Edit,
-  Clock,
-  Heart,
-  BookmarkIcon,
-  Eye,
-  Award,
-  LogOut,
-  Mail,
-  User,
-  Facebook,
-  Github,
-} from "lucide-react-native";
-import { useTheme } from "@/context/ThemeProvider";
 import { supabase } from "@/lib/supabase";
-import { useSupabaseAuth } from "@/hooks/useSupabaseAuth";
+import { useAuth } from "@/context/AuthContext";
+import BottomNavigation from "@/components/BottomNavigation";
 import AuthModal from "@/auth/components/AuthModal";
-import { useAuth } from '@/context/AuthContext';
+import {
+  User,
+  Settings,
+  LogOut,
+  Edit,
+  BookOpen,
+  Star,
+  Clock,
+  Download,
+  ChevronRight,
+} from "lucide-react-native";
 
-// Define interfaces for type safety
-interface UserListItem {
-  list_type: string;
-}
-
-interface UserProfileData {
+interface UserProfile {
+  id: string;
   username: string;
-  nickname: string;
-  avatarUrl: string;
-  bio: string;
+  avatar_url: string;
   created_at: string;
+  bio?: string;
 }
 
-interface UserStats {
-  watchingCount: number;
-  favoriteCount: number;
-  watchlistCount: number;
+interface ProfileStats {
+  watchlist: number;
+  favorites: number;
+  history: number;
+  downloads: number;
 }
 
-interface UserAnimeListItem {
-  list_type: 'watching' | 'favorites' | 'watchlist';
-  user_id: string;
-}
-
-// Add debug function
-const debug = {
-  log: (...args: any[]) => {
-    if (__DEV__) {
-      console.log('[ProfileDebug]', ...args);
-    }
-  },
-  error: (...args: any[]) => {
-    if (__DEV__) {
-      console.error('[ProfileError]', ...args);
-    }
-  },
-  state: (prefix: string, obj: any) => {
-    if (__DEV__) {
-      console.log(`[ProfileDebug] ${prefix}:`, JSON.stringify(obj, null, 2));
-    }
-  }
-};
-
-export default function ProfileScreen() {
+const ProfileScreen = () => {
   const router = useRouter();
-  const { colors, isDarkMode } = useTheme();
-  const { user, signOut, isLoading } = useAuth();
-  
-  const [listsLoading, setListsLoading] = useState(true);
-  const [profileData, setProfileData] = useState({
-    username: "",
-    nickname: "",
-    avatarUrl: "",
-    joinDate: "",
-    bio: "",
+  const { user, signOut, isLoading: authLoading } = useAuth();
+  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [stats, setStats] = useState<ProfileStats>({
+    watchlist: 0,
+    favorites: 0,
+    history: 0,
+    downloads: 0,
   });
-  
-  const [stats, setStats] = useState<UserStats>({
-    watchingCount: 0,
-    favoriteCount: 0,
-    watchlistCount: 0,
-  });
-  
-  // Auth modal state
-  const [authModalVisible, setAuthModalVisible] = useState(false);
-  const [authModalMode, setAuthModalMode] = useState<'login' | 'register'>('login');
-
-  // Handle auth state
-  useEffect(() => {
-    debug.state("Auth state changed", {
-      hasSession: !!user,
-      isLoading,
-      userId: user?.id
-    });
-
-    // Instead of redirecting, we'll show auth options
-    if (!isLoading && !user) {
-      debug.log("No session, showing auth options");
-      setAuthModalVisible(true);
-    }
-  }, [user, isLoading]);
+  const [loading, setLoading] = useState(true);
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [activeTab, setActiveTab] = useState("profile");
 
   useEffect(() => {
-    const fetchUserStats = async () => {
-      if (!user?.id) {
-        debug.log("No user ID, skipping stats fetch");
-        return;
-      }
-      
-      try {
-        debug.log("Fetching stats for user:", user.id);
-        setListsLoading(true);
-        
-        const { data, error } = await supabase
-          .from('user_anime_lists')
-          .select('list_type')
-          .eq('user_id', user.id);
-
-        if (error) {
-          debug.error("Error fetching stats:", error);
-          throw error;
-        }
-
-        const counts = {
-          watchingCount: (data as UserAnimeListItem[]).filter(item => item.list_type === 'watching').length,
-          favoriteCount: (data as UserAnimeListItem[]).filter(item => item.list_type === 'favorites').length,
-          watchlistCount: (data as UserAnimeListItem[]).filter(item => item.list_type === 'watchlist').length
-        };
-
-        debug.state("User stats", counts);
-        setStats(counts);
-      } catch (error) {
-        debug.error("Error in fetchUserStats:", error);
-      } finally {
-        setListsLoading(false);
-      }
-    };
-
-    if (user?.id) {
-      fetchUserStats();
-    }
-  }, [user?.id]);
-
-  useEffect(() => {
-    const loadUserProfile = async () => {
-      if (!user?.id) return;
-
-      try {
-        const { data: profile, error } = await supabase
-          .from('users')
-          .select('username, nickname, avatar_url, bio, created_at')
-          .eq('id', user.id)
-          .single();
-
-        if (error) throw error;
-
-        if (profile) {
-          setProfileData({
-            username: profile.username || user.email?.split('@')[0] || 'User',
-            nickname: profile.nickname || profile.username || 'User',
-            avatarUrl: profile.avatar_url ? 
-              profile.avatar_url.replace('/svg?', '/png?') : 
-              `https://api.dicebear.com/7.x/avataaars/png?seed=${profile.username}`,
-            joinDate: new Date(profile.created_at).toLocaleDateString(),
-            bio: profile.bio || '',
-          });
-        }
-      } catch (error) {
-        console.error('Error loading profile:', error);
-        // Set default values if profile loading fails
-        setProfileData((prev) => ({
-          ...prev,
-          username: user.email?.split('@')[0] || 'User',
-          nickname: user.email?.split('@')[0] || 'User',
-          avatarUrl: `https://api.dicebear.com/7.x/avataaars/png?seed=${user.email}`,
-          joinDate: new Date().toLocaleDateString(),
-          bio: '',
-        }));
-      }
-    };
-
     if (user) {
-      loadUserProfile();
+      fetchUserProfile();
+      fetchUserStats();
+    } else if (!authLoading) {
+      setLoading(false);
     }
-  }, [user]);
+  }, [user, authLoading]);
 
-  // Handle back button press
-  const handleBackPress = () => {
-    router.back();
+  const fetchUserProfile = async () => {
+    try {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from("users")
+        .select("*")
+        .eq("id", user?.id)
+        .single();
+
+      if (error) throw error;
+      setProfile(data as UserProfile);
+    } catch (error) {
+      console.error("Error fetching user profile:", error);
+      // Create a default profile if none exists
+      if (user) {
+        const defaultProfile = {
+          id: user.id,
+          username: user.email?.split("@")[0] || "User",
+          avatar_url: `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.id}`,
+          created_at: new Date().toISOString(),
+        };
+        setProfile(defaultProfile);
+      }
+    } finally {
+      setLoading(false);
+    }
   };
 
-  // Handle logout
-  const handleLogout = () => {
-    Alert.alert("Logout", "Are you sure you want to logout?", [
+  const fetchUserStats = async () => {
+    try {
+      // Fetch watchlist count
+      const { data: watchlistData, error: watchlistError } = await supabase
+        .from("user_anime_lists")
+        .select("id", { count: "exact" })
+        .eq("user_id", user?.id)
+        .eq("list_type", "watchlist");
+
+      // Fetch favorites count
+      const { data: favoritesData, error: favoritesError } = await supabase
+        .from("user_anime_lists")
+        .select("id", { count: "exact" })
+        .eq("user_id", user?.id)
+        .eq("list_type", "favorites");
+
+      // Fetch history count
+      const { data: historyData, error: historyError } = await supabase
+        .from("watch_history")
+        .select("id", { count: "exact" })
+        .eq("user_id", user?.id);
+
+      // Fetch downloads count (mock data for now)
+      const downloadsCount = 2; // Mock value
+
+      setStats({
+        watchlist: watchlistData?.length || 0,
+        favorites: favoritesData?.length || 0,
+        history: historyData?.length || 0,
+        downloads: downloadsCount,
+      });
+    } catch (error) {
+      console.error("Error fetching user stats:", error);
+    }
+  };
+
+  const handleLogout = async () => {
+    Alert.alert("Logout", "Are you sure you want to log out?", [
       { text: "Cancel", style: "cancel" },
       {
         text: "Logout",
+        style: "destructive",
         onPress: async () => {
           try {
-            debug.log("Signing out...");
             await signOut();
-            debug.log("Sign out successful");
-            setAuthModalVisible(true); // Show auth modal after logout
+            Alert.alert("Success", "You have been logged out");
           } catch (error) {
-            debug.error("Error signing out:", error);
-            Alert.alert("Error", "Failed to sign out. Please try again.");
+            console.error("Error logging out:", error);
+            Alert.alert("Error", "Failed to log out");
           }
         },
-        style: "destructive",
       },
     ]);
   };
 
-  // Handle edit profile
   const handleEditProfile = () => {
     router.push("/edit-profile");
   };
 
-  // Handle settings
-  const handleSettings = () => {
-    router.push("/settings");
-  };
-
-  // Handle list navigation
-  const handleListNavigation = (listType: string) => {
-    switch (listType) {
-      case "Currently Watching":
-        router.push("/library?tab=watching");
-        break;
-      case "Completed":
-        router.push("/library?tab=completed");
-        break;
-      case "Watchlist":
-        router.push("/library?tab=watchlist");
-        break;
-      case "Favorites":
-        router.push("/favorites");
-        break;
-      case "Watch History":
-        router.push("/library?tab=history");
-        break;
-      default:
-        Alert.alert(listType, `${listType} functionality coming soon`);
-    }
-  };
-  
-  // Handle auth modal
-  const handleOpenAuthModal = (mode: 'login' | 'register' = 'login') => {
-    setAuthModalMode(mode);
-    setAuthModalVisible(true);
-  };
-  
-  const handleCloseAuthModal = () => {
-    setAuthModalVisible(false);
-  };
-  
-  const handleLoginSuccess = async () => {
-    debug.log("Login successful, hiding auth modal");
-    setAuthModalVisible(false);
-  };
-
-  // Show a minimal loading state that doesn't block the whole screen
-  const renderLoadingOverlay = () => {
-    if (listsLoading) {
-      return (
-        <View 
-          style={{
-            position: 'absolute',
-            top: 60, // Below the header
-            left: 0,
-            right: 0,
-            height: 30,
-            backgroundColor: colors.background,
-            justifyContent: 'center',
-            alignItems: 'center',
-            flexDirection: 'row',
-            zIndex: 10,
+  const renderProfileContent = () => (
+    <ScrollView style={styles.scrollView}>
+      <View style={styles.profileHeader}>
+        <Image
+          source={{
+            uri:
+              profile?.avatar_url ||
+              `https://api.dicebear.com/7.x/avataaars/svg?seed=default`,
           }}
-        >
-          <ActivityIndicator size="small" color={colors.primary} />
-          <Text style={{ color: colors.text, marginLeft: 8, fontSize: 12 }}>Loading data...</Text>
-        </View>
-      );
-    }
-    return null;
-  };
-
-  // Render the sign-in options screen when user is not authenticated
-  const renderAuthOptions = () => {
-    return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
-        <StatusBar
-          barStyle={isDarkMode ? "light-content" : "dark-content"}
-          backgroundColor={colors.background}
+          style={styles.avatar}
         />
-        <View
-          style={{
-            width: "100%",
-            height: 60,
-            backgroundColor: colors.background,
-            flexDirection: "row",
-            alignItems: "center",
-            justifyContent: "space-between",
-            paddingHorizontal: 16,
-            borderBottomWidth: 1,
-            borderBottomColor: colors.border,
-          }}
-        >
-          <TouchableOpacity onPress={handleBackPress}>
-            <ArrowLeft size={24} color={colors.text} />
-          </TouchableOpacity>
-          <Text
-            style={{ color: colors.text, fontWeight: "bold", fontSize: 18 }}
-          >
-            Profile
-          </Text>
-          <View style={{ width: 24 }} />
+        <Text style={styles.username}>{profile?.username || "User"}</Text>
+        <Text style={styles.joinDate}>
+          Joined{" "}
+          {new Date(profile?.created_at || Date.now()).toLocaleDateString()}
+        </Text>
+        <TouchableOpacity style={styles.editButton} onPress={handleEditProfile}>
+          <Edit size={16} color="#FFFFFF" />
+          <Text style={styles.editButtonText}>Edit Profile</Text>
+        </TouchableOpacity>
+      </View>
+
+      <View style={styles.statsContainer}>
+        <View style={styles.statItem}>
+          <BookOpen size={24} color="#4F46E5" />
+          <Text style={styles.statValue}>{stats.watchlist}</Text>
+          <Text style={styles.statLabel}>Watchlist</Text>
         </View>
-        
-        <ScrollView style={{ flex: 1 }}>
-          <View style={{ alignItems: 'center', padding: 24 }}>
-            <Image
-              source={require('../assets/images/icon.png')}
-              style={{ width: 100, height: 100, borderRadius: 50, marginBottom: 20 }}
-              resizeMode="contain"
-            />
-            <Text style={{ color: colors.text, fontSize: 24, fontWeight: 'bold', marginBottom: 8 }}>
-              Welcome to AnimetempO
-            </Text>
-            <Text style={{ color: colors.textSecondary, textAlign: 'center', marginBottom: 32 }}>
-              Sign in to track your anime, create watchlists, and more!
-            </Text>
-            
-            {/* Sign In and Sign Up Buttons */}
-            <View style={{ flexDirection: 'row', width: '100%', marginBottom: 16, justifyContent: 'space-between' }}>
-              <TouchableOpacity
-                style={{
-                  backgroundColor: colors.primary,
-                  borderRadius: 8,
-                  paddingHorizontal: 20,
-                  paddingVertical: 14,
-                  flex: 1,
-                  alignItems: 'center',
-                  marginRight: 8,
-                }}
-                onPress={() => handleOpenAuthModal('login')}
-              >
-                <Text style={{ color: "#FFFFFF", fontWeight: "bold", fontSize: 16 }}>
-                  Sign In
-                </Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity
-                style={{
-                  backgroundColor: 'transparent',
-                  borderWidth: 1,
-                  borderColor: colors.primary,
-                  borderRadius: 8,
-                  paddingHorizontal: 20,
-                  paddingVertical: 14,
-                  flex: 1,
-                  alignItems: 'center',
-                  marginLeft: 8,
-                }}
-                onPress={() => handleOpenAuthModal('register')}
-              >
-                <Text style={{ color: colors.primary, fontWeight: "bold", fontSize: 16 }}>
-                  Create Account
-                </Text>
-              </TouchableOpacity>
-            </View>
-            
-            <Text style={{ color: colors.textSecondary, marginVertical: 16 }}>
-              Or continue with
-            </Text>
-            
-            {/* Social Sign In Options */}
-            <View style={{ flexDirection: 'row', justifyContent: 'center', marginBottom: 32 }}>
-              <TouchableOpacity
-                style={{
-                  width: 50,
-                  height: 50,
-                  borderRadius: 25,
-                  backgroundColor: colors.card,
-                  justifyContent: 'center',
-                  alignItems: 'center',
-                  marginHorizontal: 8,
-                }}
-                onPress={() => Alert.alert("Coming Soon", "Google sign-in will be available soon!")}
-              >
-                {/* Google icon */}
-                <View style={{ 
-                  width: 24, 
-                  height: 24, 
-                  justifyContent: 'center', 
-                  alignItems: 'center' 
-                }}>
-                  <View style={{ 
-                    width: 20, 
-                    height: 20, 
-                    borderRadius: 10, 
-                    backgroundColor: '#FFFFFF',
-                    justifyContent: 'center',
-                    alignItems: 'center'
-                  }}>
-                    <Text style={{ 
-                      color: '#4285F4', 
-                      fontWeight: 'bold', 
-                      fontSize: 16,
-                      lineHeight: 20
-                    }}>G</Text>
-                  </View>
-                </View>
-              </TouchableOpacity>
-              
-              <TouchableOpacity
-                style={{
-                  width: 50,
-                  height: 50,
-                  borderRadius: 25,
-                  backgroundColor: colors.card,
-                  justifyContent: 'center',
-                  alignItems: 'center',
-                  marginHorizontal: 8,
-                }}
-                onPress={() => Alert.alert("Coming Soon", "Facebook sign-in will be available soon!")}
-              >
-                <Facebook size={24} color="#1877F2" />
-              </TouchableOpacity>
-            </View>
-            
-            {/* Features Preview */}
-            <View style={{ width: '100%', marginTop: 16 }}>
-              <Text style={{ color: colors.text, fontSize: 18, fontWeight: 'bold', marginBottom: 16 }}>
-                Why Sign In?
-              </Text>
-              
-              <View style={{ marginBottom: 16, flexDirection: 'row', alignItems: 'center' }}>
-                <View style={{ 
-                  width: 40, 
-                  height: 40, 
-                  borderRadius: 20, 
-                  backgroundColor: 'rgba(99, 102, 241, 0.2)', 
-                  justifyContent: 'center', 
-                  alignItems: 'center',
-                  marginRight: 12
-                }}>
-                  <BookmarkIcon size={20} color={colors.primary} />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={{ color: colors.text, fontWeight: 'bold', marginBottom: 4 }}>
-                    Create Watchlists
-                  </Text>
-                  <Text style={{ color: colors.textSecondary, fontSize: 14 }}>
-                    Keep track of anime you want to watch later
-                  </Text>
-                </View>
-              </View>
-              
-              <View style={{ marginBottom: 16, flexDirection: 'row', alignItems: 'center' }}>
-                <View style={{ 
-                  width: 40, 
-                  height: 40, 
-                  borderRadius: 20, 
-                  backgroundColor: 'rgba(239, 68, 68, 0.2)', 
-                  justifyContent: 'center', 
-                  alignItems: 'center',
-                  marginRight: 12
-                }}>
-                  <Heart size={20} color={colors.error} />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={{ color: colors.text, fontWeight: 'bold', marginBottom: 4 }}>
-                    Save Favorites
-                  </Text>
-                  <Text style={{ color: colors.textSecondary, fontSize: 14 }}>
-                    Mark your favorite anime and access them easily
-                  </Text>
-                </View>
-              </View>
-              
-              <View style={{ marginBottom: 16, flexDirection: 'row', alignItems: 'center' }}>
-                <View style={{ 
-                  width: 40, 
-                  height: 40, 
-                  borderRadius: 20, 
-                  backgroundColor: 'rgba(16, 185, 129, 0.2)', 
-                  justifyContent: 'center', 
-                  alignItems: 'center',
-                  marginRight: 12
-                }}>
-                  <Clock size={20} color={colors.success} />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={{ color: colors.text, fontWeight: 'bold', marginBottom: 4 }}>
-                    Track Progress
-                  </Text>
-                  <Text style={{ color: colors.textSecondary, fontSize: 14 }}>
-                    Keep track of episodes you've watched
-                  </Text>
-                </View>
-              </View>
-            </View>
+        <View style={styles.statItem}>
+          <Star size={24} color="#F59E0B" />
+          <Text style={styles.statValue}>{stats.favorites}</Text>
+          <Text style={styles.statLabel}>Favorites</Text>
+        </View>
+        <View style={styles.statItem}>
+          <Clock size={24} color="#10B981" />
+          <Text style={styles.statValue}>{stats.history}</Text>
+          <Text style={styles.statLabel}>History</Text>
+        </View>
+        <View style={styles.statItem}>
+          <Download size={24} color="#6366F1" />
+          <Text style={styles.statValue}>{stats.downloads}</Text>
+          <Text style={styles.statLabel}>Downloads</Text>
+        </View>
+      </View>
+
+      <View style={styles.menuContainer}>
+        <TouchableOpacity
+          style={styles.menuItem}
+          onPress={() => router.push("/lists")}
+        >
+          <View style={styles.menuItemLeft}>
+            <BookOpen size={20} color="#FFFFFF" />
+            <Text style={styles.menuItemText}>My Lists</Text>
           </View>
-          
-          {/* Bottom padding */}
-          <View style={{ height: 80 }} />
-        </ScrollView>
-        
-        {/* Auth Modal */}
-        <AuthModal 
-          visible={authModalVisible} 
-          onClose={handleCloseAuthModal}
-          onLogin={handleLoginSuccess}
-          initialMode={authModalMode}
-        />
-      </SafeAreaView>
-    );
-  };
+          <ChevronRight size={20} color="#9CA3AF" />
+        </TouchableOpacity>
 
-  // Add detailed logging for session state and navigation
-  useEffect(() => {
-    debug.state("Checking session state on profile load", {
-      userExists: !!user,
-      userId: user?.id
-    });
+        <TouchableOpacity
+          style={styles.menuItem}
+          onPress={() => router.push("/history")}
+        >
+          <View style={styles.menuItemLeft}>
+            <Clock size={20} color="#FFFFFF" />
+            <Text style={styles.menuItemText}>Watch History</Text>
+          </View>
+          <ChevronRight size={20} color="#9CA3AF" />
+        </TouchableOpacity>
 
-    if (!user) {
-      debug.log("No user found, setting authModalVisible to true");
-      setAuthModalVisible(true);
-    } else {
-      debug.log("User found, setting authModalVisible to false");
-      setAuthModalVisible(false);
-    }
-  }, [user]);
+        <TouchableOpacity
+          style={styles.menuItem}
+          onPress={() => router.push("/downloads")}
+        >
+          <View style={styles.menuItemLeft}>
+            <Download size={20} color="#FFFFFF" />
+            <Text style={styles.menuItemText}>Downloads</Text>
+          </View>
+          <ChevronRight size={20} color="#9CA3AF" />
+        </TouchableOpacity>
 
-  // Log auth modal visibility
-  useEffect(() => {
-    debug.state("AuthModal visibility changed", {
-      authModalVisible,
-      authModalMode
-    });
-  }, [authModalVisible, authModalMode]);
+        <TouchableOpacity
+          style={styles.menuItem}
+          onPress={() => router.push("/settings")}
+        >
+          <View style={styles.menuItemLeft}>
+            <Settings size={20} color="#FFFFFF" />
+            <Text style={styles.menuItemText}>Settings</Text>
+          </View>
+          <ChevronRight size={20} color="#9CA3AF" />
+        </TouchableOpacity>
 
-  // Log user state
-  useEffect(() => {
-    debug.state("User state changed", {
-      userExists: !!user,
-      userId: user?.id
-    });
+        <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
+          <LogOut size={20} color="#EF4444" />
+          <Text style={styles.logoutText}>Logout</Text>
+        </TouchableOpacity>
+      </View>
+    </ScrollView>
+  );
 
-    if (!user) {
-      debug.log("No user, rendering auth options");
-    }
-  }, [user]);
-
-  if (!user) {
-    return renderAuthOptions();
-  }
+  const renderAuthPrompt = () => (
+    <View style={styles.authPromptContainer}>
+      <User size={64} color="#6B7280" />
+      <Text style={styles.authPromptTitle}>Sign In Required</Text>
+      <Text style={styles.authPromptText}>
+        Please sign in to view your profile and access your anime lists.
+      </Text>
+      <TouchableOpacity
+        style={styles.signInButton}
+        onPress={() => setShowAuthModal(true)}
+      >
+        <Text style={styles.signInText}>Sign In</Text>
+      </TouchableOpacity>
+    </View>
+  );
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
-      <StatusBar
-        barStyle={isDarkMode ? "light-content" : "dark-content"}
-        backgroundColor={colors.background}
-      />
-      <View style={{ flex: 1 }}>
-        {/* Header */}
-        <View
-          style={{
-            width: "100%",
-            height: 60,
-            backgroundColor: colors.background,
-            flexDirection: "row",
-            alignItems: "center",
-            justifyContent: "space-between",
-            paddingHorizontal: 16,
-            borderBottomWidth: 1,
-            borderBottomColor: colors.border,
-          }}
-        >
-          <TouchableOpacity onPress={handleBackPress}>
-            <ArrowLeft size={24} color={colors.text} />
-          </TouchableOpacity>
-          <Text
-            style={{ color: colors.text, fontWeight: "bold", fontSize: 18 }}
-          >
-            Profile
-          </Text>
-          <TouchableOpacity onPress={handleSettings}>
-            <Settings size={24} color={colors.text} />
-          </TouchableOpacity>
-        </View>
+    <SafeAreaView style={styles.container}>
+      <StatusBar barStyle="light-content" backgroundColor="#171717" />
 
-        {renderLoadingOverlay()}
-
-        <ScrollView style={{ flex: 1 }}>
-          {/* Profile Header */}
-          <View
-            style={{
-              padding: 16,
-              borderBottomWidth: 1,
-              borderBottomColor: colors.border,
-            }}
-          >
-            <View style={{ flexDirection: "row", alignItems: "center" }}>
-              <Image
-                source={{ uri: profileData.avatarUrl }}
-                style={{ width: 80, height: 80, borderRadius: 40 }}
-                resizeMode="cover"
-                onError={(e) => {
-                  console.error("Error loading avatar:", e.nativeEvent.error);
-                  // Use a more reliable fallback with PNG format
-                  setProfileData((prev) => ({
-                    ...prev,
-                    avatarUrl: `https://api.dicebear.com/7.x/avataaars/png?seed=${Math.random().toString(36).substring(7)}`,
-                  }));
-                }}
-              />
-              <View style={{ marginLeft: 16, flex: 1 }}>
-                <Text
-                  style={{
-                    color: colors.text,
-                    fontSize: 20,
-                    fontWeight: "bold",
-                  }}
-                >
-                  {profileData.nickname || profileData.username}
-                </Text>
-                <Text
-                  style={{
-                    color: colors.textSecondary,
-                    fontSize: 14,
-                    marginTop: 2,
-                  }}
-                >
-                  @{profileData.username}
-                </Text>
-                <Text style={{ color: colors.textSecondary, fontSize: 14 }}>
-                  Member since {profileData.joinDate}
-                </Text>
-                <TouchableOpacity
-                  style={{
-                    backgroundColor: colors.primary,
-                    borderRadius: 20,
-                    paddingHorizontal: 16,
-                    paddingVertical: 4,
-                    marginTop: 8,
-                    alignSelf: "flex-start",
-                    flexDirection: "row",
-                    alignItems: "center",
-                  }}
-                  onPress={handleEditProfile}
-                >
-                  <Edit size={14} color="#FFFFFF" />
-                  <Text
-                    style={{ color: "#FFFFFF", fontSize: 12, marginLeft: 4 }}
-                  >
-                    Edit Profile
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-
-            <Text style={{ color: colors.textSecondary, marginTop: 16 }}>
-              {profileData.bio}
-            </Text>
-
-            {/* Stats */}
-            <View
-              style={{
-                flexDirection: "row",
-                justifyContent: "space-between",
-                marginTop: 24,
-              }}
-            >
-              <View style={{ alignItems: "center" }}>
-                <Text
-                  style={{
-                    color: colors.text,
-                    fontSize: 18,
-                    fontWeight: "bold",
-                  }}
-                >
-                  {listsLoading ? "-" : stats.watchingCount}
-                </Text>
-                <Text style={{ color: colors.textSecondary, fontSize: 12 }}>
-                  Watching
-                </Text>
-              </View>
-              <View style={{ alignItems: "center" }}>
-                <Text
-                  style={{
-                    color: colors.text,
-                    fontSize: 18,
-                    fontWeight: "bold",
-                  }}
-                >
-                  {listsLoading ? "-" : stats.favoriteCount}
-                </Text>
-                <Text style={{ color: colors.textSecondary, fontSize: 12 }}>
-                  Favorites
-                </Text>
-              </View>
-              <View style={{ alignItems: "center" }}>
-                <Text
-                  style={{
-                    color: colors.text,
-                    fontSize: 18,
-                    fontWeight: "bold",
-                  }}
-                >
-                  {listsLoading ? "-" : stats.watchlistCount}
-                </Text>
-                <Text style={{ color: colors.textSecondary, fontSize: 12 }}>
-                  Watchlist
-                </Text>
-              </View>
-            </View>
-          </View>
-
-          {/* Lists Section */}
-          <View style={{ padding: 16 }}>
-            <Text
-              style={{
-                color: colors.text,
-                fontSize: 18,
-                fontWeight: "bold",
-                marginBottom: 16,
-              }}
-            >
-              My Lists
-            </Text>
-
-            <TouchableOpacity
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-                padding: 12,
-                backgroundColor: colors.card,
-                borderRadius: 8,
-                marginBottom: 12,
-              }}
-              onPress={() => handleListNavigation("Currently Watching")}
-            >
-              <Eye size={20} color={colors.primary} />
-              <Text style={{ color: colors.text, marginLeft: 12, flex: 1 }}>
-                Currently Watching
-              </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-                padding: 12,
-                backgroundColor: colors.card,
-                borderRadius: 8,
-                marginBottom: 12,
-              }}
-              onPress={() => handleListNavigation("Completed")}
-            >
-              <Award size={20} color={colors.success} />
-              <Text style={{ color: colors.text, marginLeft: 12, flex: 1 }}>
-                Completed
-              </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-                padding: 12,
-                backgroundColor: colors.card,
-                borderRadius: 8,
-                marginBottom: 12,
-              }}
-              onPress={() => handleListNavigation("Watchlist")}
-            >
-              <BookmarkIcon size={20} color={colors.warning} />
-              <Text style={{ color: colors.text, marginLeft: 12, flex: 1 }}>
-                Watchlist
-              </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-                padding: 12,
-                backgroundColor: colors.card,
-                borderRadius: 8,
-                marginBottom: 12,
-              }}
-              onPress={() => handleListNavigation("Favorites")}
-            >
-              <Heart size={20} color={colors.error} fill={colors.error} />
-              <Text style={{ color: colors.text, marginLeft: 12, flex: 1 }}>
-                Favorites
-              </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-                padding: 12,
-                backgroundColor: colors.card,
-                borderRadius: 8,
-              }}
-              onPress={() => handleListNavigation("Watch History")}
-            >
-              <Clock size={20} color={colors.info} />
-              <Text style={{ color: colors.text, marginLeft: 12, flex: 1 }}>
-                Watch History
-              </Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* Logout Button */}
-          <View style={{ padding: 16, marginTop: 16 }}>
-            <TouchableOpacity
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-                justifyContent: "center",
-                padding: 12,
-                backgroundColor: "rgba(239, 68, 68, 0.15)",
-                borderRadius: 8,
-              }}
-              onPress={handleLogout}
-            >
-              <LogOut size={20} color={colors.error} />
-              <Text
-                style={{
-                  color: colors.error,
-                  marginLeft: 8,
-                  fontWeight: "500",
-                }}
-              >
-                Logout
-              </Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* Bottom padding to ensure content is visible above the navigation bar */}
-          <View style={{ height: 80 }} />
-        </ScrollView>
+      <View style={styles.header}>
+        <Text style={styles.headerTitle}>Profile</Text>
       </View>
+
+      {user ? renderProfileContent() : renderAuthPrompt()}
+
+      <BottomNavigation
+        currentRoute="/profile"
+        activeTab={activeTab}
+        onTabChange={(tab) => {
+          setActiveTab(tab);
+          switch (tab) {
+            case "home":
+              router.push("/");
+              break;
+            case "history":
+              router.push("/history");
+              break;
+            case "lists":
+              router.push("/lists");
+              break;
+            case "downloads":
+              router.push("/downloads");
+              break;
+          }
+        }}
+      />
+
+      <AuthModal
+        visible={showAuthModal}
+        onClose={() => setShowAuthModal(false)}
+      />
     </SafeAreaView>
   );
-}
+};
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: "#171717",
+  },
+  header: {
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 16,
+    backgroundColor: "#171717",
+  },
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: "bold",
+    color: "#FFFFFF",
+  },
+  scrollView: {
+    flex: 1,
+  },
+  profileHeader: {
+    alignItems: "center",
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: "#333333",
+  },
+  avatar: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: "#2A2A2A",
+    marginBottom: 16,
+  },
+  username: {
+    fontSize: 24,
+    fontWeight: "bold",
+    color: "#FFFFFF",
+    marginBottom: 4,
+  },
+  joinDate: {
+    fontSize: 14,
+    color: "#9CA3AF",
+    marginBottom: 16,
+  },
+  editButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#4F46E5",
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 20,
+  },
+  editButtonText: {
+    color: "#FFFFFF",
+    marginLeft: 8,
+    fontWeight: "500",
+  },
+  statsContainer: {
+    flexDirection: "row",
+    justifyContent: "space-around",
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: "#333333",
+  },
+  statItem: {
+    alignItems: "center",
+  },
+  statValue: {
+    fontSize: 18,
+    fontWeight: "bold",
+    color: "#FFFFFF",
+    marginTop: 8,
+    marginBottom: 4,
+  },
+  statLabel: {
+    fontSize: 12,
+    color: "#9CA3AF",
+  },
+  menuContainer: {
+    padding: 16,
+  },
+  menuItem: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: "#333333",
+  },
+  menuItemLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  menuItemText: {
+    fontSize: 16,
+    color: "#FFFFFF",
+    marginLeft: 16,
+  },
+  logoutButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 24,
+    paddingVertical: 16,
+  },
+  logoutText: {
+    fontSize: 16,
+    color: "#EF4444",
+    marginLeft: 16,
+    fontWeight: "500",
+  },
+  authPromptContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20,
+  },
+  authPromptTitle: {
+    fontSize: 18,
+    fontWeight: "bold",
+    color: "#FFFFFF",
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  authPromptText: {
+    fontSize: 14,
+    color: "#9CA3AF",
+    textAlign: "center",
+    maxWidth: 300,
+    marginBottom: 24,
+  },
+  signInButton: {
+    backgroundColor: "#4F46E5",
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 8,
+  },
+  signInText: {
+    color: "#FFFFFF",
+    fontSize: 16,
+    fontWeight: "bold",
+  },
+});
+
+export default ProfileScreen;

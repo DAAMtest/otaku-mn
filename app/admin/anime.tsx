@@ -28,32 +28,30 @@ import {
   FileText,
   Image as ImageIcon,
 } from "lucide-react-native";
-import { supabase } from "@/lib/supabase";
-import { useAuth } from "@/context/AuthContext";
-import useAnimeData from "@/hooks/useAnimeData";
+import { useAuthStore } from "@/src/store/authStore";
+import { useGenreStore } from "@/src/store/genreStore";
+import { useAdminAnimeStore, AdminAnime } from "@/src/store/adminAnimeStore";
 
-type UUID = string;
-
-interface Anime {
-  id: UUID;
-  title: string;
-  image_url: string;
-  rating: number;
-  description: string;
-  release_date: string;
-  genres?: string[];
-}
+// Using AdminAnime type from adminAnimeStore
 
 export default function AnimeManagement() {
   const router = useRouter();
-  const { user, session } = useAuth();
-  const [animeList, setAnimeList] = useState<Anime[]>([]);
-  const [filteredAnimeList, setFilteredAnimeList] = useState<Anime[]>([]);
+  const { user, session } = useAuthStore();
+  const {
+    animeList,
+    loading,
+    error,
+    fetchAnimeList,
+    addAnime,
+    updateAnime,
+    deleteAnime,
+  } = useAdminAnimeStore();
+  const { genres, fetchGenres } = useGenreStore();
+  const [filteredAnimeList, setFilteredAnimeList] = useState<AdminAnime[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
-  const [loading, setLoading] = useState(true);
   const [modalVisible, setModalVisible] = useState(false);
   const [editMode, setEditMode] = useState(false);
-  const [currentAnime, setCurrentAnime] = useState<Anime>({
+  const [currentAnime, setCurrentAnime] = useState<AdminAnime>({
     id: "",
     title: "",
     image_url: "",
@@ -61,8 +59,8 @@ export default function AnimeManagement() {
     description: "",
     release_date: new Date().toISOString().split("T")[0],
   });
-  const [genres, setGenres] = useState<{ id: string; name: string }[]>([]);
   const [selectedGenres, setSelectedGenres] = useState<string[]>([]);
+  const [selectedGenreIds, setSelectedGenreIds] = useState<string[]>([]);
 
   // Check authentication and fetch anime list on component mount
   useEffect(() => {
@@ -86,57 +84,6 @@ export default function AnimeManagement() {
     }
   }, [searchQuery, animeList]);
 
-  // Fetch anime list from Supabase
-  const fetchAnimeList = async () => {
-    setLoading(true);
-    try {
-      const { data, error } = await supabase
-        .from("anime")
-        .select(
-          `
-          id,
-          title,
-          image_url,
-          rating,
-          description,
-          release_date,
-          anime_genres(genres(id, name))
-        `,
-        )
-        .order("title");
-
-      if (error) throw error;
-
-      const formattedData = data.map((item: any) => ({
-        ...item,
-        genres: item.anime_genres?.map((g: any) => g.genres.name) || [],
-      }));
-
-      setAnimeList(formattedData);
-      setFilteredAnimeList(formattedData);
-    } catch (error) {
-      console.error("Error fetching anime:", error);
-      Alert.alert("Error", "Failed to fetch anime list");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Fetch genres from Supabase
-  const fetchGenres = async () => {
-    try {
-      const { data, error } = await supabase
-        .from("genres")
-        .select("id, name")
-        .order("name");
-
-      if (error) throw error;
-      setGenres(data || []);
-    } catch (error) {
-      console.error("Error fetching genres:", error);
-    }
-  };
-
   // Handle back button press
   const handleBackPress = () => {
     router.back();
@@ -154,14 +101,26 @@ export default function AnimeManagement() {
       release_date: new Date().toISOString().split("T")[0],
     });
     setSelectedGenres([]);
+    setSelectedGenreIds([]);
     setModalVisible(true);
   };
 
   // Handle edit anime
-  const handleEditAnime = (anime: Anime) => {
+  const handleEditAnime = (anime: AdminAnime) => {
     setEditMode(true);
     setCurrentAnime(anime);
     setSelectedGenres(anime.genres || []);
+
+    // Find genre IDs based on names
+    const genreIds =
+      anime.genres
+        ?.map((genreName) => {
+          const genre = genres.find((g) => g.name === genreName);
+          return genre?.id || "";
+        })
+        .filter((id) => id !== "") || [];
+
+    setSelectedGenreIds(genreIds);
     setModalVisible(true);
   };
 
@@ -172,29 +131,11 @@ export default function AnimeManagement() {
       {
         text: "Delete",
         onPress: async () => {
-          try {
-            // First delete related records in anime_genres
-            const { error: genresError } = await supabase
-              .from("anime_genres")
-              .delete()
-              .eq("anime_id", id);
-
-            if (genresError) throw genresError;
-
-            // Then delete the anime
-            const { error } = await supabase
-              .from("anime")
-              .delete()
-              .eq("id", id);
-
-            if (error) throw error;
-
-            // Update the local state
-            setAnimeList(animeList.filter((anime) => anime.id !== id));
+          const { error } = await deleteAnime(id);
+          if (error) {
+            Alert.alert("Error", `Failed to delete anime: ${error.message}`);
+          } else {
             Alert.alert("Success", "Anime deleted successfully");
-          } catch (error) {
-            console.error("Error deleting anime:", error);
-            Alert.alert("Error", "Failed to delete anime");
           }
         },
         style: "destructive",
@@ -216,69 +157,16 @@ export default function AnimeManagement() {
     }
 
     try {
-      let animeId = currentAnime.id;
-
       if (editMode) {
         // Update existing anime
-        const { error } = await supabase
-          .from("anime")
-          .update({
-            title: currentAnime.title,
-            image_url: currentAnime.image_url,
-            rating: currentAnime.rating,
-            description: currentAnime.description,
-            release_date: currentAnime.release_date,
-            updated_at: new Date().toISOString(),
-          })
-          .eq("id", currentAnime.id);
-
+        const { error } = await updateAnime(currentAnime, selectedGenreIds);
         if (error) throw error;
       } else {
         // Insert new anime
-        const { data, error } = await supabase
-          .from("anime")
-          .insert({
-            title: currentAnime.title,
-            image_url: currentAnime.image_url,
-            rating: currentAnime.rating,
-            description: currentAnime.description,
-            release_date: currentAnime.release_date,
-          })
-          .select("id")
-          .single();
-
+        const { error, id } = await addAnime(currentAnime, selectedGenreIds);
         if (error) throw error;
-        animeId = data.id;
       }
 
-      // Handle genres
-      if (editMode) {
-        // Delete existing genre relationships
-        const { error: deleteError } = await supabase
-          .from("anime_genres")
-          .delete()
-          .eq("anime_id", animeId);
-
-        if (deleteError) throw deleteError;
-      }
-
-      // Add new genre relationships
-      for (const genreName of selectedGenres) {
-        const genre = genres.find((g) => g.name === genreName);
-        if (genre) {
-          const { error: insertError } = await supabase
-            .from("anime_genres")
-            .insert({
-              anime_id: animeId,
-              genre_id: genre.id,
-            });
-
-          if (insertError) throw insertError;
-        }
-      }
-
-      // Refresh anime list
-      await fetchAnimeList();
       setModalVisible(false);
       Alert.alert(
         "Success",
@@ -291,16 +179,26 @@ export default function AnimeManagement() {
   };
 
   // Toggle genre selection
-  const toggleGenre = (genreName: string) => {
-    setSelectedGenres((prev) =>
-      prev.includes(genreName)
-        ? prev.filter((g) => g !== genreName)
-        : [...prev, genreName],
-    );
+  const toggleGenre = (genreName: string, genreId: string) => {
+    setSelectedGenres((prev) => {
+      if (prev.includes(genreName)) {
+        return prev.filter((g) => g !== genreName);
+      } else {
+        return [...prev, genreName];
+      }
+    });
+
+    setSelectedGenreIds((prev) => {
+      if (prev.includes(genreId)) {
+        return prev.filter((id) => id !== genreId);
+      } else {
+        return [...prev, genreId];
+      }
+    });
   };
 
   // Render anime item
-  const renderAnimeItem = ({ item }: { item: Anime }) => (
+  const renderAnimeItem = ({ item }: { item: AdminAnime }) => (
     <View className="flex-row bg-gray-800 rounded-lg p-3 mb-3">
       <Image
         source={{ uri: item.image_url }}
@@ -544,7 +442,7 @@ export default function AnimeManagement() {
                       <TouchableOpacity
                         key={genre.id}
                         className={`m-1 px-3 py-1 rounded-full ${selectedGenres.includes(genre.name) ? "bg-purple-600" : "bg-gray-800"}`}
-                        onPress={() => toggleGenre(genre.name)}
+                        onPress={() => toggleGenre(genre.name, genre.id)}
                       >
                         <Text className="text-white">{genre.name}</Text>
                       </TouchableOpacity>

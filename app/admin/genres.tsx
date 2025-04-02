@@ -22,20 +22,10 @@ import {
   Tag,
   Film,
 } from "lucide-react-native";
-import { supabase } from "@/lib/supabase";
-import { useAuth } from "@/context/AuthContext";
-import type { Database } from "@/lib/database.types";
-import useAnimeData from "@/hooks/useAnimeData";
+import { useAuthStore } from "@/src/store/authStore";
+import { useGenreStore, Genre } from "@/src/store/genreStore";
 
-type Tables = Database["public"]["Tables"];
-type Genre = Tables["genres"]["Row"] & {
-  anime_count?: number;
-};
-
-interface CountResult {
-  genre_id: string;
-  count: number;
-}
+// Using Genre type from genreStore
 
 /**
  * Genre management screen for administrators.
@@ -43,10 +33,16 @@ interface CountResult {
  */
 export default function GenreManagement() {
   const router = useRouter();
-  const { session } = useAuth();
-  const { genres: allGenres, fetchGenres: fetchAllGenres } = useAnimeData();
-  const [genres, setGenres] = useState<Genre[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { session } = useAuthStore();
+  const {
+    genres,
+    loading,
+    error,
+    fetchGenres,
+    addGenre,
+    updateGenre,
+    deleteGenre,
+  } = useGenreStore();
   const [searchQuery, setSearchQuery] = useState("");
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [editingGenre, setEditingGenre] = useState<Genre | null>(null);
@@ -61,138 +57,60 @@ export default function GenreManagement() {
     fetchGenres();
   }, [session]);
 
-  const fetchGenres = async () => {
-    try {
-      setLoading(true);
-      const { data: genres, error: genresError } = await supabase
-        .from("genres")
-        .select("*")
-        .order("name");
-
-      if (genresError) throw genresError;
-
-      // Fetch anime counts for each genre
-      const { data: counts, error: countsError } = await supabase.rpc(
-        "get_genre_anime_counts",
-      );
-
-      if (countsError) throw countsError;
-
-      const genresWithCounts = genres.map((genre: Genre) => ({
-        ...genre,
-        anime_count:
-          (counts as CountResult[]).find((count) => count.genre_id === genre.id)
-            ?.count || 0,
-      }));
-
-      setGenres(genresWithCounts);
-    } catch (error) {
-      console.error("Error fetching genres:", error);
-      Alert.alert("Error", "Failed to fetch genres");
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const handleAddGenre = async () => {
-    try {
-      if (!genreName.trim()) {
-        Alert.alert("Error", "Genre name is required");
-        return;
-      }
-
-      const { data, error } = await supabase
-        .from("genres")
-        .insert([
-          {
-            name: genreName.trim(),
-            description: description.trim() || null,
-            updated_at: new Date().toISOString(),
-          },
-        ])
-        .select()
-        .single();
-
-      if (error) throw error;
-
-      setGenres([...genres, { ...data, anime_count: 0 }]);
-      setIsModalVisible(false);
-      setGenreName("");
-      setDescription("");
-    } catch (error) {
-      console.error("Error adding genre:", error);
-      Alert.alert("Error", "Failed to add genre");
+    if (!genreName.trim()) {
+      Alert.alert("Error", "Genre name is required");
+      return;
     }
+
+    const { error } = await addGenre(genreName, description);
+
+    if (error) {
+      Alert.alert("Error", `Failed to add genre: ${error.message}`);
+      return;
+    }
+
+    setIsModalVisible(false);
+    setGenreName("");
+    setDescription("");
   };
 
   const handleEditGenre = async () => {
-    try {
-      if (!editingGenre || !genreName.trim()) {
-        Alert.alert("Error", "Genre name is required");
-        return;
-      }
-
-      const { error } = await supabase
-        .from("genres")
-        .update({
-          name: genreName.trim(),
-          description: description.trim() || null,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", editingGenre.id);
-
-      if (error) throw error;
-
-      setGenres(
-        genres.map((genre) =>
-          genre.id === editingGenre.id
-            ? {
-                ...genre,
-                name: genreName.trim(),
-                description: description.trim() || null,
-                updated_at: new Date().toISOString(),
-              }
-            : genre,
-        ),
-      );
-      setIsModalVisible(false);
-      setEditingGenre(null);
-      setGenreName("");
-      setDescription("");
-    } catch (error) {
-      console.error("Error updating genre:", error);
-      Alert.alert("Error", "Failed to update genre");
+    if (!editingGenre || !genreName.trim()) {
+      Alert.alert("Error", "Genre name is required");
+      return;
     }
+
+    const { error } = await updateGenre(
+      editingGenre.id,
+      genreName,
+      description,
+    );
+
+    if (error) {
+      Alert.alert("Error", `Failed to update genre: ${error.message}`);
+      return;
+    }
+
+    setIsModalVisible(false);
+    setEditingGenre(null);
+    setGenreName("");
+    setDescription("");
   };
 
   const handleDeleteGenre = async (genre: Genre) => {
-    try {
-      if (genre.anime_count && genre.anime_count > 0) {
-        Alert.alert(
-          "Cannot Delete",
-          `This genre is associated with ${genre.anime_count} anime. Please remove these associations first.`,
-        );
-        return;
-      }
+    const { error } = await deleteGenre(genre.id);
 
-      const { error } = await supabase
-        .from("genres")
-        .delete()
-        .eq("id", genre.id);
-
-      if (error) throw error;
-
-      setGenres(genres.filter((g) => g.id !== genre.id));
-    } catch (error) {
-      console.error("Error deleting genre:", error);
-      Alert.alert("Error", "Failed to delete genre");
+    if (error) {
+      Alert.alert("Error", error.message);
     }
   };
 
   const filteredGenres = genres.filter(
     (genre) =>
       genre.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      genre.description?.toLowerCase().includes(searchQuery.toLowerCase()),
+      (genre.description &&
+        genre.description.toLowerCase().includes(searchQuery.toLowerCase())),
   );
 
   const renderItem = ({ item: genre }: { item: Genre }) => (

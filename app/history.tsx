@@ -11,148 +11,170 @@ import {
   Alert,
 } from "react-native";
 import { useRouter } from "expo-router";
+import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/context/AuthContext";
 import BottomNavigation from "@/components/BottomNavigation";
 import AuthModal from "@/auth/components/AuthModal";
-import { Download, Trash2, Play } from "lucide-react-native";
+import { Clock, Trash2 } from "lucide-react-native";
 
-interface DownloadedAnime {
+interface WatchHistoryItem {
   id: string;
-  title: string;
-  imageUrl: string;
-  episodeNumber: number;
-  episodeTitle: string;
-  downloadDate: string;
-  fileSize: string;
+  anime_id: string;
+  episode_id: string;
+  watched_at: string;
   progress: number;
+  anime: {
+    id: string;
+    title: string;
+    image_url: string;
+  };
+  episodes: {
+    id: string;
+    title: string;
+    episode_number: number;
+  };
 }
 
-const DownloadsScreen = () => {
+const HistoryScreen = () => {
   const router = useRouter();
   const { user, isLoading: authLoading } = useAuth();
-  const [downloads, setDownloads] = useState<DownloadedAnime[]>([]);
+  const [history, setHistory] = useState<WatchHistoryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAuthModal, setShowAuthModal] = useState(false);
 
-  // Mock data for demonstration
   useEffect(() => {
     if (user) {
-      // In a real app, you would fetch this from a local database or storage
-      const mockDownloads: DownloadedAnime[] = [
-        {
-          id: "1",
-          title: "Attack on Titan",
-          imageUrl:
-            "https://images.unsplash.com/photo-1579546929518-9e396f3cc809?w=800&q=80",
-          episodeNumber: 1,
-          episodeTitle: "To You, 2000 Years From Now",
-          downloadDate: new Date().toISOString(),
-          fileSize: "250 MB",
-          progress: 100,
-        },
-        {
-          id: "2",
-          title: "Demon Slayer",
-          imageUrl:
-            "https://images.unsplash.com/photo-1614851099175-e5b30eb6f696?w=800&q=80",
-          episodeNumber: 19,
-          episodeTitle: "Hinokami",
-          downloadDate: new Date().toISOString(),
-          fileSize: "320 MB",
-          progress: 100,
-        },
-      ];
-      setDownloads(mockDownloads);
-      setLoading(false);
+      fetchWatchHistory();
     } else if (!authLoading) {
       setLoading(false);
     }
   }, [user, authLoading]);
 
-  const handleDeleteDownload = (id: string) => {
+  const fetchWatchHistory = async () => {
+    try {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from("watch_history")
+        .select(
+          `
+          id,
+          anime_id,
+          episode_id,
+          watched_at,
+          progress,
+          anime:anime_id (id, title, image_url),
+          episodes:episode_id (id, title, episode_number)
+        `,
+        )
+        .eq("user_id", user?.id)
+        .order("watched_at", { ascending: false });
+
+      if (error) throw error;
+      setHistory(data as WatchHistoryItem[]);
+    } catch (error) {
+      console.error("Error fetching watch history:", error);
+      Alert.alert("Error", "Failed to load watch history");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleClearHistory = async () => {
     Alert.alert(
-      "Delete Download",
-      "Are you sure you want to delete this download?",
+      "Clear History",
+      "Are you sure you want to clear your watch history?",
       [
         { text: "Cancel", style: "cancel" },
         {
-          text: "Delete",
+          text: "Clear",
           style: "destructive",
-          onPress: () => {
-            // In a real app, you would delete the file from storage
-            setDownloads(downloads.filter((item) => item.id !== id));
+          onPress: async () => {
+            try {
+              const { error } = await supabase
+                .from("watch_history")
+                .delete()
+                .eq("user_id", user?.id);
+
+              if (error) throw error;
+              setHistory([]);
+              Alert.alert("Success", "Watch history cleared successfully");
+            } catch (error) {
+              console.error("Error clearing watch history:", error);
+              Alert.alert("Error", "Failed to clear watch history");
+            }
           },
         },
       ],
     );
   };
 
-  const handlePlayDownload = (item: DownloadedAnime) => {
-    // In a real app, you would play the downloaded file
+  const handleItemPress = (item: WatchHistoryItem) => {
     router.push({
-      pathname: `/anime/${item.id}`,
-      params: { animeId: item.id },
+      pathname: `/anime/${item.anime_id}`,
+      params: { animeId: item.anime_id },
     });
   };
 
-  const handleClearAllDownloads = () => {
-    Alert.alert(
-      "Clear All Downloads",
-      "Are you sure you want to delete all downloads?",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Delete All",
-          style: "destructive",
-          onPress: () => {
-            // In a real app, you would delete all files from storage
-            setDownloads([]);
-          },
-        },
-      ],
-    );
+  const handleDeleteItem = async (id: string) => {
+    try {
+      const { error } = await supabase
+        .from("watch_history")
+        .delete()
+        .eq("id", id);
+
+      if (error) throw error;
+      setHistory(history.filter((item) => item.id !== id));
+    } catch (error) {
+      console.error("Error deleting history item:", error);
+      Alert.alert("Error", "Failed to delete history item");
+    }
   };
 
-  const renderDownloadItem = ({ item }: { item: DownloadedAnime }) => {
-    const date = new Date(item.downloadDate);
+  const renderHistoryItem = ({ item }: { item: WatchHistoryItem }) => {
+    const date = new Date(item.watched_at);
     const formattedDate = date.toLocaleDateString();
+    const formattedTime = date.toLocaleTimeString([], {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
 
     return (
-      <View style={styles.downloadItem}>
-        <Image source={{ uri: item.imageUrl }} style={styles.animeImage} />
+      <TouchableOpacity
+        style={styles.historyItem}
+        onPress={() => handleItemPress(item)}
+      >
+        <Image
+          source={{ uri: item.anime.image_url }}
+          style={styles.animeImage}
+        />
         <View style={styles.itemInfo}>
-          <Text style={styles.animeTitle}>{item.title}</Text>
+          <Text style={styles.animeTitle}>{item.anime.title}</Text>
           <Text style={styles.episodeTitle}>
-            Episode {item.episodeNumber}: {item.episodeTitle}
+            Episode {item.episodes.episode_number}: {item.episodes.title}
           </Text>
-          <Text style={styles.downloadInfo}>
-            {formattedDate} • {item.fileSize}
-          </Text>
+          <View style={styles.timeContainer}>
+            <Clock size={14} color="#9CA3AF" />
+            <Text style={styles.timeText}>
+              {formattedDate} at {formattedTime}
+            </Text>
+          </View>
         </View>
-        <View style={styles.actionButtons}>
-          <TouchableOpacity
-            style={styles.actionButton}
-            onPress={() => handlePlayDownload(item)}
-          >
-            <Play size={20} color="#4F46E5" />
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.actionButton}
-            onPress={() => handleDeleteDownload(item.id)}
-          >
-            <Trash2 size={20} color="#EF4444" />
-          </TouchableOpacity>
-        </View>
-      </View>
+        <TouchableOpacity
+          style={styles.deleteButton}
+          onPress={() => handleDeleteItem(item.id)}
+        >
+          <Trash2 size={20} color="#EF4444" />
+        </TouchableOpacity>
+      </TouchableOpacity>
     );
   };
 
   const renderEmptyState = () => (
     <View style={styles.emptyContainer}>
-      <Download size={64} color="#6B7280" />
-      <Text style={styles.emptyTitle}>No Downloads</Text>
+      <Clock size={64} color="#6B7280" />
+      <Text style={styles.emptyTitle}>No Watch History</Text>
       <Text style={styles.emptyText}>
-        Your downloaded anime episodes will appear here.
+        Your watch history will appear here once you start watching anime.
       </Text>
     </View>
   );
@@ -162,9 +184,9 @@ const DownloadsScreen = () => {
       <StatusBar barStyle="light-content" backgroundColor="#171717" />
 
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Downloads</Text>
-        {downloads.length > 0 && (
-          <TouchableOpacity onPress={handleClearAllDownloads}>
+        <Text style={styles.headerTitle}>Watch History</Text>
+        {history.length > 0 && (
+          <TouchableOpacity onPress={handleClearHistory}>
             <Text style={styles.clearText}>Clear All</Text>
           </TouchableOpacity>
         )}
@@ -174,7 +196,7 @@ const DownloadsScreen = () => {
         <View style={styles.emptyContainer}>
           <Text style={styles.emptyTitle}>Sign In Required</Text>
           <Text style={styles.emptyText}>
-            Please sign in to access your downloads.
+            Please sign in to view your watch history.
           </Text>
           <TouchableOpacity
             style={styles.signInButton}
@@ -185,8 +207,8 @@ const DownloadsScreen = () => {
         </View>
       ) : (
         <FlatList
-          data={downloads}
-          renderItem={renderDownloadItem}
+          data={history}
+          renderItem={renderHistoryItem}
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.listContent}
           ListEmptyComponent={loading ? null : renderEmptyState()}
@@ -194,18 +216,18 @@ const DownloadsScreen = () => {
       )}
 
       <BottomNavigation
-        currentRoute="/downloads"
-        activeTab="downloads"
+        currentRoute="/history"
+        activeTab="history"
         onTabChange={(tab) => {
           switch (tab) {
             case "home":
               router.push("/");
               break;
-            case "history":
-              router.push("/history");
-              break;
             case "lists":
               router.push("/lists");
+              break;
+            case "downloads":
+              router.push("/downloads");
               break;
             case "profile":
               router.push("/profile");
@@ -247,7 +269,7 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     paddingBottom: 80,
   },
-  downloadItem: {
+  historyItem: {
     flexDirection: "row",
     padding: 12,
     borderBottomWidth: 1,
@@ -275,17 +297,18 @@ const styles = StyleSheet.create({
     color: "#D1D5DB",
     marginBottom: 8,
   },
-  downloadInfo: {
-    fontSize: 12,
-    color: "#9CA3AF",
-  },
-  actionButtons: {
+  timeContainer: {
     flexDirection: "row",
     alignItems: "center",
   },
-  actionButton: {
+  timeText: {
+    fontSize: 12,
+    color: "#9CA3AF",
+    marginLeft: 4,
+  },
+  deleteButton: {
+    justifyContent: "center",
     padding: 8,
-    marginLeft: 8,
   },
   emptyContainer: {
     flex: 1,
@@ -320,4 +343,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default DownloadsScreen;
+export default HistoryScreen;

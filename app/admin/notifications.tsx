@@ -27,31 +27,30 @@ import {
   Heart,
   Play,
 } from "lucide-react-native";
-import { supabase } from "@/lib/supabase";
-import { useAuth } from "@/context/AuthContext";
-import useNotifications from "@/hooks/useNotifications";
-
-interface Notification {
-  id: string;
-  title: string;
-  message: string;
-  type: string;
-  created_at: string;
-  sent_to: string;
-  is_read?: boolean;
-}
+import { useAuthStore } from "@/src/store/authStore";
+import {
+  useAdminNotificationStore,
+  Notification,
+} from "@/src/store/adminNotificationStore";
 
 export default function NotificationManagement() {
   const router = useRouter();
-  const { user, session } = useAuth();
-  const { notifications: userNotifications, fetchNotifications } =
-    useNotifications(user?.id || null);
-  const [notificationList, setNotificationList] = useState<Notification[]>([]);
+  const { user, session } = useAuthStore();
+  const {
+    notificationList,
+    notificationTypes,
+    audienceTypes,
+    loading,
+    error,
+    fetchNotificationList,
+    sendNotification,
+    deleteNotification,
+  } = useAdminNotificationStore();
+
   const [filteredNotificationList, setFilteredNotificationList] = useState<
     Notification[]
   >([]);
   const [searchQuery, setSearchQuery] = useState("");
-  const [loading, setLoading] = useState(true);
   const [modalVisible, setModalVisible] = useState(false);
   const [currentNotification, setCurrentNotification] = useState<{
     title: string;
@@ -64,31 +63,6 @@ export default function NotificationManagement() {
     type: "system",
     audience: "all",
   });
-
-  // Notification types
-  const notificationTypes = [
-    { id: "system", name: "System", icon: Info, color: "#A78BFA" },
-    {
-      id: "anime_recommendation",
-      name: "Anime Recommendation",
-      icon: Play,
-      color: "#60A5FA",
-    },
-    {
-      id: "friend_activity",
-      name: "Friend Activity",
-      icon: Heart,
-      color: "#F87171",
-    },
-  ];
-
-  // Audience types
-  const audienceTypes = [
-    { id: "all", name: "All Users" },
-    { id: "active", name: "Active Users" },
-    { id: "inactive", name: "Inactive Users" },
-    { id: "admins", name: "Admins Only" },
-  ];
 
   // Check authentication and fetch notification list on component mount
   useEffect(() => {
@@ -117,33 +91,6 @@ export default function NotificationManagement() {
     }
   }, [searchQuery, notificationList]);
 
-  // Fetch notification list from Supabase
-  const fetchNotificationList = async () => {
-    setLoading(true);
-    try {
-      const { data, error } = await supabase
-        .from("notifications")
-        .select("*")
-        .order("created_at", { ascending: false });
-
-      if (error) throw error;
-
-      // Add sent_to field for demo purposes
-      const enhancedData = data.map((notification: any) => ({
-        ...notification,
-        sent_to: notification.user_id ? "Specific User" : "All Users",
-      }));
-
-      setNotificationList(enhancedData);
-      setFilteredNotificationList(enhancedData);
-    } catch (error) {
-      console.error("Error fetching notifications:", error);
-      Alert.alert("Error", "Failed to fetch notification list");
-    } finally {
-      setLoading(false);
-    }
-  };
-
   // Handle back button press
   const handleBackPress = () => {
     router.back();
@@ -170,25 +117,17 @@ export default function NotificationManagement() {
         {
           text: "Delete",
           onPress: async () => {
-            try {
-              const { error } = await supabase
-                .from("notifications")
-                .delete()
-                .eq("id", id);
+            const { error } = await deleteNotification(id);
 
-              if (error) throw error;
-
-              // Update the local state
-              setNotificationList(
-                notificationList.filter(
-                  (notification) => notification.id !== id,
-                ),
+            if (error) {
+              Alert.alert(
+                "Error",
+                `Failed to delete notification: ${error.message}`,
               );
-              Alert.alert("Success", "Notification deleted successfully");
-            } catch (error) {
-              console.error("Error deleting notification:", error);
-              Alert.alert("Error", "Failed to delete notification");
+              return;
             }
+
+            Alert.alert("Success", "Notification deleted successfully");
           },
           style: "destructive",
         },
@@ -209,37 +148,45 @@ export default function NotificationManagement() {
       return;
     }
 
-    try {
-      // In a real app, you would fetch users based on audience
-      // For this demo, we'll just create a notification for the current user
-      const { error } = await supabase.from("notifications").insert({
-        title: currentNotification.title,
-        message: currentNotification.message,
-        type: currentNotification.type,
-        user_id: user?.id, // In a real app, this would be based on audience
-        is_read: false,
-      });
+    const { error } = await sendNotification({
+      title: currentNotification.title,
+      message: currentNotification.message,
+      type: currentNotification.type,
+      audience: currentNotification.audience,
+      user_id: user?.id, // In a real app, this would be based on audience
+    });
 
-      if (error) throw error;
-
-      // Refresh notification list
-      await fetchNotificationList();
-      setModalVisible(false);
-      Alert.alert(
-        "Success",
-        `Notification sent to ${currentNotification.audience} users`,
-      );
-    } catch (error) {
-      console.error("Error sending notification:", error);
-      Alert.alert("Error", "Failed to send notification");
+    if (error) {
+      Alert.alert("Error", `Failed to send notification: ${error.message}`);
+      return;
     }
+
+    setModalVisible(false);
+    Alert.alert(
+      "Success",
+      `Notification sent to ${currentNotification.audience} users`,
+    );
   };
 
   // Get icon based on notification type
   const getNotificationIcon = (type: string) => {
     const notificationType = notificationTypes.find((t) => t.id === type);
     if (notificationType) {
-      const IconComponent = notificationType.icon;
+      // Map string icon names to actual components
+      let IconComponent;
+      switch (notificationType.icon) {
+        case "Info":
+          IconComponent = Info;
+          break;
+        case "Play":
+          IconComponent = Play;
+          break;
+        case "Heart":
+          IconComponent = Heart;
+          break;
+        default:
+          IconComponent = Bell;
+      }
       return <IconComponent size={20} color={notificationType.color} />;
     }
     return <Bell size={20} color="#9CA3AF" />;
@@ -377,7 +324,22 @@ export default function NotificationManagement() {
                   <Text className="text-gray-300 mb-2">Notification Type</Text>
                   <View className="flex-row flex-wrap">
                     {notificationTypes.map((type) => {
-                      const IconComponent = type.icon;
+                      // Map string icon names to actual components
+                      let IconComponent;
+                      switch (type.icon) {
+                        case "Info":
+                          IconComponent = Info;
+                          break;
+                        case "Play":
+                          IconComponent = Play;
+                          break;
+                        case "Heart":
+                          IconComponent = Heart;
+                          break;
+                        default:
+                          IconComponent = Bell;
+                      }
+
                       return (
                         <TouchableOpacity
                           key={type.id}

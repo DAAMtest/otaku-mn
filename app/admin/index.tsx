@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useEffect } from "react";
 import {
   View,
   Text,
@@ -25,21 +25,22 @@ import {
   Heart,
   TrendingUp,
 } from "lucide-react-native";
-import { useAuth } from "@/context/AuthContext";
+import { useAuthStore } from "@/src/store/authStore";
+import { useAdminStore } from "@/src/store/adminStore";
+import { useAnimeStore } from "@/src/store/animeStore";
+import { useGenreStore } from "@/src/store/genreStore";
 import AdminNavigation from "@/components/AdminNavigation";
-import useAnimeData from "@/hooks/useAnimeData";
-import useAnimeLists from "@/hooks/useAnimeLists";
-import { supabase } from "@/lib/supabase";
 
 export default function AdminDashboard() {
   const router = useRouter();
-  const { user, session } = useAuth();
-  const { trendingAnime, newReleases } = useAnimeData();
-  const [activeSection, setActiveSection] = useState("overview");
-  const [loading, setLoading] = useState(true);
-  const [showSidebar, setShowSidebar] = useState(false);
+  const { user, session } = useAuthStore();
+  const { stats, recentActivity, loading, fetchStats, fetchRecentActivity } =
+    useAdminStore();
+  const { genres, fetchGenres } = useGenreStore();
+  const { trendingAnime, fetchTrendingAnime } = useAnimeStore();
   const { width } = Dimensions.get("window");
   const isTablet = width > 768;
+  const isLoading = loading.stats || loading.activity;
 
   // Check authentication and fetch dashboard data
   useEffect(() => {
@@ -47,10 +48,18 @@ export default function AdminDashboard() {
       router.replace("/");
       return;
     }
-    // Simulate API call
-    setTimeout(() => {
-      setLoading(false);
-    }, 1000);
+
+    // Fetch all required data for the dashboard
+    const loadDashboardData = async () => {
+      await Promise.all([
+        fetchStats(),
+        fetchRecentActivity(),
+        fetchGenres(),
+        fetchTrendingAnime(),
+      ]);
+    };
+
+    loadDashboardData();
   }, [session, router]);
 
   // Handle back button press
@@ -132,43 +141,23 @@ export default function AdminDashboard() {
     },
   ];
 
-  // Recent activity data
-  const recentActivity = [
-    {
-      id: "1",
-      type: "user_joined",
-      message: "New user registered",
-      timestamp: "10 minutes ago",
-      icon: Users,
-      color: "#60A5FA",
-    },
-    {
-      id: "2",
-      type: "content_reported",
-      message: "Content reported for review",
-      timestamp: "25 minutes ago",
-      icon: Flag,
-      color: "#F87171",
-    },
-    {
-      id: "3",
-      type: "anime_added",
-      message: "New anime added to database",
-      timestamp: "1 hour ago",
-      icon: Film,
-      color: "#34D399",
-    },
-    {
-      id: "4",
-      type: "high_traffic",
-      message: "Unusual traffic detected",
-      timestamp: "3 hours ago",
-      icon: TrendingUp,
-      color: "#F59E0B",
-    },
-  ];
+  // Map activity types to icons
+  const getActivityIcon = (type: string) => {
+    switch (type) {
+      case "user_joined":
+        return Users;
+      case "content_reported":
+        return Flag;
+      case "anime_added":
+        return Film;
+      case "high_traffic":
+        return TrendingUp;
+      default:
+        return Bell;
+    }
+  };
 
-  if (loading) {
+  if (isLoading) {
     return (
       <SafeAreaView className="flex-1 bg-gray-900">
         <StatusBar barStyle="light-content" backgroundColor="#111827" />
@@ -196,7 +185,7 @@ export default function AdminDashboard() {
             <Text className="text-white font-bold text-lg">
               Admin Dashboard
             </Text>
-            <TouchableOpacity onPress={() => setShowSidebar(!showSidebar)}>
+            <TouchableOpacity>
               <Shield size={24} color="#FFFFFF" />
             </TouchableOpacity>
           </View>
@@ -251,28 +240,36 @@ export default function AdminDashboard() {
             <View className="flex-row flex-wrap justify-between mb-6">
               <View className="bg-gray-800 rounded-lg p-3 w-[48%] mb-3">
                 <View className="flex-row items-center justify-between">
-                  <Text className="text-blue-400 font-bold text-lg">42</Text>
+                  <Text className="text-blue-400 font-bold text-lg">
+                    {stats.animeCount}
+                  </Text>
                   <Film size={20} color="#60A5FA" />
                 </View>
                 <Text className="text-gray-400 text-xs">Anime Titles</Text>
               </View>
               <View className="bg-gray-800 rounded-lg p-3 w-[48%] mb-3">
                 <View className="flex-row items-center justify-between">
-                  <Text className="text-green-400 font-bold text-lg">128</Text>
+                  <Text className="text-green-400 font-bold text-lg">
+                    {stats.userCount}
+                  </Text>
                   <Users size={20} color="#34D399" />
                 </View>
                 <Text className="text-gray-400 text-xs">Users</Text>
               </View>
               <View className="bg-gray-800 rounded-lg p-3 w-[48%] mb-3">
                 <View className="flex-row items-center justify-between">
-                  <Text className="text-purple-400 font-bold text-lg">8</Text>
+                  <Text className="text-purple-400 font-bold text-lg">
+                    {stats.genreCount}
+                  </Text>
                   <Tag size={20} color="#A78BFA" />
                 </View>
                 <Text className="text-gray-400 text-xs">Genres</Text>
               </View>
               <View className="bg-gray-800 rounded-lg p-3 w-[48%] mb-3">
                 <View className="flex-row items-center justify-between">
-                  <Text className="text-amber-400 font-bold text-lg">1.2k</Text>
+                  <Text className="text-amber-400 font-bold text-lg">
+                    {stats.viewsToday.toLocaleString()}
+                  </Text>
                   <Eye size={20} color="#F59E0B" />
                 </View>
                 <Text className="text-gray-400 text-xs">Views Today</Text>
@@ -285,7 +282,7 @@ export default function AdminDashboard() {
             </Text>
             <View className="bg-gray-800 rounded-lg p-4 mb-6">
               {recentActivity.map((activity) => {
-                const IconComponent = activity.icon;
+                const IconComponent = getActivityIcon(activity.type);
                 return (
                   <View
                     key={activity.id}
