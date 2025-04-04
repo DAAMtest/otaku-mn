@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
   Pressable,
   Image,
+  Alert,
 } from "react-native";
 import { Video, ResizeMode, AVPlaybackStatus } from "expo-av";
 import * as ScreenOrientation from "expo-screen-orientation";
@@ -104,11 +105,23 @@ const VideoPlayer = ({
       }
       // Reset screen orientation when unmounting
       if (Platform.OS !== "web") {
-        ScreenOrientation.lockAsync(
-          ScreenOrientation.OrientationLock.PORTRAIT_UP,
-        );
+        try {
+          ScreenOrientation.lockAsync(
+            ScreenOrientation.OrientationLock.PORTRAIT_UP,
+          );
+        } catch (error) {
+          console.error("Error resetting screen orientation:", error);
+        }
       }
     };
+  }, []);
+
+  // Handle web-specific setup
+  useEffect(() => {
+    if (Platform.OS === "web") {
+      // Any web-specific initialization can go here
+      console.log("VideoPlayer initialized on web platform");
+    }
   }, []);
 
   // Handle controls visibility timeout
@@ -265,18 +278,24 @@ const VideoPlayer = ({
   // Toggle fullscreen mode
   const toggleFullscreen = async () => {
     if (Platform.OS === "web") {
+      // For web, just update the state without changing orientation
       setIsFullscreen(!isFullscreen);
       return;
     }
 
-    if (isFullscreen) {
-      await ScreenOrientation.lockAsync(
-        ScreenOrientation.OrientationLock.PORTRAIT_UP,
-      );
-    } else {
-      await ScreenOrientation.lockAsync(
-        ScreenOrientation.OrientationLock.LANDSCAPE,
-      );
+    try {
+      if (isFullscreen) {
+        await ScreenOrientation.lockAsync(
+          ScreenOrientation.OrientationLock.PORTRAIT_UP,
+        );
+      } else {
+        await ScreenOrientation.lockAsync(
+          ScreenOrientation.OrientationLock.LANDSCAPE,
+        );
+      }
+    } catch (error) {
+      console.error("Error changing screen orientation:", error);
+      // Fallback for web or when orientation change fails
     }
     setIsFullscreen(!isFullscreen);
   };
@@ -322,7 +341,22 @@ const VideoPlayer = ({
     // In a real implementation, you would use expo-file-system to download
     // the video file and store it locally
     console.log("Downloading video for offline viewing");
-    // Show a toast or notification to the user
+
+    // Show different behavior based on platform
+    if (Platform.OS === "web") {
+      // For web, we might just open the video in a new tab or show a message
+      if (typeof window !== "undefined" && window.alert) {
+        window.alert(
+          "Downloads are not supported in the web version. Please use our mobile app for this feature.",
+        );
+      } else {
+        console.log("Downloads are not supported in the web version");
+      }
+    } else {
+      // Show a toast or notification to the user on mobile
+      console.log("Starting download for mobile device");
+      // Implement mobile-specific download logic here
+    }
   };
 
   return (

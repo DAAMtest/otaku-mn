@@ -15,38 +15,18 @@ import {
   User,
   MessageSquare,
 } from "lucide-react-native";
-// Import Haptics conditionally to avoid dependency issues
-let Haptics: any = {
-  impactAsync: () => Promise.resolve(),
-  ImpactFeedbackStyle: { Light: null },
-};
-
-// We'll try to import the actual module only if it's available
-try {
-  if (Platform.OS !== "web") {
-    // Dynamic import to avoid dependency issues
-    import("expo-haptics")
-      .then((module) => {
-        Haptics = module;
-      })
-      .catch((err) => {
-        console.log("Haptics not available", err);
-      });
-  }
-} catch (error) {
-  console.log("Error importing Haptics", error);
-}
+import * as Haptics from "expo-haptics";
 
 interface BottomNavigationProps {
-  currentRoute?: string;
-  activeTab?: string;
-  onTabChange?: (tab: string) => void;
+  currentRoute: string;
+  activeTab: string;
+  onTabChange: (tab: string) => void;
 }
 
-const BottomNavigation = ({
-  currentRoute = "",
-  activeTab = "home",
-  onTabChange = () => {},
+const BottomNavigationEnhanced = ({
+  currentRoute,
+  activeTab,
+  onTabChange,
 }: BottomNavigationProps) => {
   const router = useRouter();
   const pathname = usePathname();
@@ -63,11 +43,7 @@ const BottomNavigation = ({
   const handleTabPress = (route: string, tab: string) => {
     // Provide haptic feedback on tab press (mobile only)
     if (Platform.OS !== "web") {
-      try {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      } catch (error) {
-        console.log("Haptics not available", error);
-      }
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     }
 
     if (currentRoute !== route) {
@@ -223,4 +199,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default BottomNavigation;
+export default BottomNavigationEnhanced;

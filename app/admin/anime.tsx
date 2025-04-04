@@ -12,6 +12,7 @@ import {
   ActivityIndicator,
   Modal,
   ScrollView,
+  Platform,
 } from "react-native";
 import { useRouter } from "expo-router";
 import {
@@ -126,33 +127,60 @@ export default function AnimeManagement() {
 
   // Handle delete anime
   const handleDeleteAnime = (id: string) => {
-    Alert.alert("Delete Anime", "Are you sure you want to delete this anime?", [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Delete",
-        onPress: async () => {
-          const { error } = await deleteAnime(id);
+    if (Platform.OS === "web") {
+      if (window.confirm("Are you sure you want to delete this anime?")) {
+        deleteAnime(id).then(({ error }) => {
           if (error) {
-            Alert.alert("Error", `Failed to delete anime: ${error.message}`);
+            window.alert(`Failed to delete anime: ${error.message}`);
           } else {
-            Alert.alert("Success", "Anime deleted successfully");
+            window.alert("Anime deleted successfully");
           }
-        },
-        style: "destructive",
-      },
-    ]);
+        });
+      }
+    } else {
+      Alert.alert(
+        "Delete Anime",
+        "Are you sure you want to delete this anime?",
+        [
+          { text: "Cancel", style: "cancel" },
+          {
+            text: "Delete",
+            onPress: async () => {
+              const { error } = await deleteAnime(id);
+              if (error) {
+                Alert.alert(
+                  "Error",
+                  `Failed to delete anime: ${error.message}`,
+                );
+              } else {
+                Alert.alert("Success", "Anime deleted successfully");
+              }
+            },
+            style: "destructive",
+          },
+        ],
+      );
+    }
   };
 
   // Handle save anime
   const handleSaveAnime = async () => {
     // Validate form
     if (!currentAnime.title.trim()) {
-      Alert.alert("Error", "Title is required");
+      if (Platform.OS === "web") {
+        window.alert("Title is required");
+      } else {
+        Alert.alert("Error", "Title is required");
+      }
       return;
     }
 
     if (!currentAnime.image_url.trim()) {
-      Alert.alert("Error", "Image URL is required");
+      if (Platform.OS === "web") {
+        window.alert("Image URL is required");
+      } else {
+        Alert.alert("Error", "Image URL is required");
+      }
       return;
     }
 
@@ -168,13 +196,23 @@ export default function AnimeManagement() {
       }
 
       setModalVisible(false);
-      Alert.alert(
-        "Success",
-        editMode ? "Anime updated successfully" : "Anime added successfully",
-      );
+      if (Platform.OS === "web") {
+        window.alert(
+          editMode ? "Anime updated successfully" : "Anime added successfully",
+        );
+      } else {
+        Alert.alert(
+          "Success",
+          editMode ? "Anime updated successfully" : "Anime added successfully",
+        );
+      }
     } catch (error) {
       console.error("Error saving anime:", error);
-      Alert.alert("Error", "Failed to save anime");
+      if (Platform.OS === "web") {
+        window.alert("Failed to save anime");
+      } else {
+        Alert.alert("Error", "Failed to save anime");
+      }
     }
   };
 
@@ -262,7 +300,7 @@ export default function AnimeManagement() {
 
   return (
     <SafeAreaView className="flex-1 bg-gray-900">
-      <StatusBar barStyle="light-content" backgroundColor="#111827" />
+      <StatusBar style="light" backgroundColor="#111827" />
       <View className="flex-1">
         {/* Header */}
         <View className="w-full h-[60px] bg-gray-900 flex-row items-center justify-between px-4 border-b border-gray-800">

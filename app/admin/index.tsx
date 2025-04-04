@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import {
   View,
   Text,
@@ -9,6 +9,7 @@ import {
   Alert,
   Dimensions,
   ActivityIndicator,
+  Platform,
 } from "react-native";
 import { useRouter } from "expo-router";
 import {
@@ -24,6 +25,8 @@ import {
   Download,
   Heart,
   TrendingUp,
+  Flag,
+  Search,
 } from "lucide-react-native";
 import { useAuthStore } from "@/src/store/authStore";
 import { useAdminStore } from "@/src/store/adminStore";
@@ -38,7 +41,7 @@ export default function AdminDashboard() {
     useAdminStore();
   const { genres, fetchGenres } = useGenreStore();
   const { trendingAnime, fetchTrendingAnime } = useAnimeStore();
-  const { width } = Dimensions.get("window");
+  const { width } = Dimensions.get(Platform.OS === "web" ? "screen" : "window");
   const isTablet = width > 768;
   const isLoading = loading.stats || loading.activity;
 
@@ -83,8 +86,6 @@ export default function AdminDashboard() {
       router.push("/admin/analytics");
     } else if (section === "settings") {
       router.push("/admin/settings");
-    } else {
-      setActiveSection(section);
     }
   };
 
@@ -160,7 +161,7 @@ export default function AdminDashboard() {
   if (isLoading) {
     return (
       <SafeAreaView className="flex-1 bg-gray-900">
-        <StatusBar barStyle="light-content" backgroundColor="#111827" />
+        <StatusBar style="light" backgroundColor="#111827" />
         <View className="flex-1 items-center justify-center">
           <ActivityIndicator size="large" color="#6366F1" />
           <Text className="text-gray-400 mt-4">Loading dashboard...</Text>
@@ -171,7 +172,7 @@ export default function AdminDashboard() {
 
   return (
     <SafeAreaView className="flex-1 bg-gray-900">
-      <StatusBar barStyle="light-content" backgroundColor="#111827" />
+      <StatusBar style="light" backgroundColor="#111827" />
       <View className="flex-1 flex-row">
         {/* Sidebar for tablet/desktop */}
         {isTablet && <AdminNavigation variant="sidebar" />}
@@ -348,6 +349,3 @@ export default function AdminDashboard() {
     </SafeAreaView>
   );
 }
-
-// Import missing components
-import { Flag } from "lucide-react-native";
