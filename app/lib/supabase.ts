@@ -2,9 +2,10 @@ import "react-native-url-polyfill/auto";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as SecureStore from "expo-secure-store";
 import { createClient } from "@supabase/supabase-js";
+import { Platform } from "react-native";
 
 /**
- * Supabase client configuration with AsyncStorage for session persistence.
+ * Supabase client configuration with platform-specific storage adapters.
  * Uses environment variables for configuration.
  */
 
@@ -22,7 +23,7 @@ const supabaseDebug = {
   },
 };
 
-// Secure storage implementation with size check and error handling
+// Secure storage implementation with size check and error handling for native platforms
 const ExpoSecureStoreAdapter = {
   getItem: async (key: string) => {
     try {
@@ -103,6 +104,42 @@ const ExpoSecureStoreAdapter = {
   },
 };
 
+// Web storage adapter using localStorage with error handling
+const WebStorageAdapter = {
+  getItem: async (key: string) => {
+    try {
+      return localStorage.getItem(key);
+    } catch (error) {
+      supabaseDebug.error(
+        `Error getting item from localStorage: ${key}`,
+        error,
+      );
+      return null;
+    }
+  },
+  setItem: async (key: string, value: string) => {
+    try {
+      localStorage.setItem(key, value);
+    } catch (error) {
+      supabaseDebug.error(`Error setting item in localStorage: ${key}`, error);
+    }
+  },
+  removeItem: async (key: string) => {
+    try {
+      localStorage.removeItem(key);
+    } catch (error) {
+      supabaseDebug.error(
+        `Error removing item from localStorage: ${key}`,
+        error,
+      );
+    }
+  },
+};
+
+// Choose the appropriate storage adapter based on platform
+const storageAdapter =
+  Platform.OS === "web" ? WebStorageAdapter : ExpoSecureStoreAdapter;
+
 const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL || "";
 const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || "";
 
@@ -110,17 +147,20 @@ if (!supabaseUrl || !supabaseAnonKey) {
   throw new Error("Missing Supabase environment variables");
 }
 
-// Create Supabase client with enhanced configuration
+// Create Supabase client with platform-specific configuration
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
-    storage: ExpoSecureStoreAdapter,
+    storage: storageAdapter,
     autoRefreshToken: true,
     persistSession: true,
-    detectSessionInUrl: false,
+    // Enable detecting auth state from URL for web platforms
+    detectSessionInUrl: Platform.OS === "web",
+    flowType: Platform.OS === "web" ? "pkce" : "implicit",
   },
   global: {
     headers: {
-      "X-Client-Info": "animetempo-mobile",
+      "X-Client-Info":
+        Platform.OS === "web" ? "animetempo-web" : "animetempo-mobile",
     },
   },
   // Add request/response logging in development

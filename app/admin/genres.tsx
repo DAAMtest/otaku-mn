@@ -162,7 +162,7 @@ export default function GenreManagement() {
 
   return (
     <SafeAreaView className="flex-1 bg-gray-900">
-      <StatusBar barStyle="light-content" />
+      <StatusBar barStyle="light-content" style="light" />
       <View className="flex-row items-center p-4 border-b border-gray-800">
         <TouchableOpacity onPress={() => router.back()} className="mr-4">
           <ArrowLeft size={24} color="#fff" />
